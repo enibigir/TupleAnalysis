@@ -12,6 +12,7 @@
 #include <TSystem.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -22,10 +23,19 @@
 namespace {
 
 const std::string kConfigFile = "../cfg/configFile.txt";               // relative to macros/
-const std::string kProdDir    = "/scratch/ui3_1/gcoulon/HSCP_prod/";   // ntuples and their file lists
+const std::string kDefaultProdDir = "/scratch/ui3_1/gcoulon/HSCP_prod/";   // ntuples and their file lists
 const char* const kTreeName   = "HSCPMiniAODAnalyzer/Events";
 
-// Location of the ntuples of one dataset, relative to kProdDir:
+// kDefaultProdDir, unless the environment variable HSCP_PROD_DIR is set
+std::string prodDir() {
+    const char* env = std::getenv("HSCP_PROD_DIR");
+    if (!env || !*env) return kDefaultProdDir;
+    std::string dir = env;
+    if (dir.back() != '/') dir += '/';
+    return dir;
+}
+
+// Location of the ntuples of one dataset, relative to prodDir():
 // either a single ROOT file, or a text file listing one ROOT file per line.
 struct Input {
     std::string path;
@@ -104,7 +114,7 @@ InputMap knownInputs(const std::string& version) {
 
 // Add the ntuples of one dataset to the chain. Returns false if its file list cannot be opened.
 bool fillChain(TChain& chain, const Input& input) {
-    const std::string path = kProdDir + input.path;
+    const std::string path = prodDir() + input.path;
     if (!input.isList) {
         chain.AddFile(path.c_str());
         return true;

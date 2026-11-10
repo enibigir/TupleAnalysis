@@ -46,27 +46,27 @@ def HSCPSelectorAddLabelsAndPointers2Vector(label):
    return content
 
 
-# The 3 functions below generate the codes for all preselection found in a pandas dataframe called df
-# (row.iloc[0] is the label, row.iloc[1] the C++ expression)
+# The 3 functions below generate the codes for all preselections found in sels,
+# a list of (label, C++ expression) pairs
 
-def Code_HSCPSelectorProto(df):
+def Code_HSCPSelectorProto(sels):
     code = ""
-    for index, row in df.iterrows():
-        if IsCommented(row.iloc[0]):
+    for label, instruction in sels:
+        if IsCommented(label):
             continue
-        code+=HSCPSelectorProto(row.iloc[0])+"\n"
+        code+=HSCPSelectorProto(label)+"\n"
     return code
 
-def Code_HSCPSelectorImpl(df):
+def Code_HSCPSelectorImpl(sels):
     code = ""
-    for index, row in df.iterrows():
-        if IsCommented(row.iloc[0]): continue
-        code+=HSCPSelectorImpl(row.iloc[0],row.iloc[1])+"\n"
+    for label, instruction in sels:
+        if IsCommented(label): continue
+        code+=HSCPSelectorImpl(label,instruction)+"\n"
     return code
 
-def Code_HSCPSelectorAddLabelsAndPointers2Vector(df):
+def Code_HSCPSelectorAddLabelsAndPointers2Vector(sels):
     code = ""
-    for index, row in df.iterrows():
-        if IsCommented(row.iloc[0]): continue
-        code+=HSCPSelectorAddLabelsAndPointers2Vector(row.iloc[0])+"\n"
+    for label, instruction in sels:
+        if IsCommented(label): continue
+        code+=HSCPSelectorAddLabelsAndPointers2Vector(label)+"\n"
     return code

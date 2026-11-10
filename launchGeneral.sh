@@ -3,4 +3,4 @@ python3 CreateSelector.py
 cd ../macros
 time root -l -q -b macro.cc
 
-rm ../macros/HSCPSelector_C*
+rm -f ../macros/HSCPSelector_C*

@@ -17,7 +17,7 @@ I wrote all the code in this project myself. However, this README and the commen
 ## Requirements
 
 - ROOT 6, with `root-config` in the `PATH`. The code was developed inside `CMSSW_15_0_13_patch1`.
-- Python 3 with `pandas`, to generate the selector.
+- Python 3 (standard library only), to generate the selector.
 - `numpy`, `uproot` and `matplotlib`, only for `python/DeriveSF.py`.
 
 ## Quick start
@@ -165,7 +165,7 @@ The format of the tables is described in [`doc/src_inc.md`](doc/src_inc.md).
 
 | Where | What |
 |---|---|
-| `macros/macro.cc`, `kProdDir` | directory of the ntuples and of their file lists |
+| `macros/macro.cc`, `kDefaultProdDir` | directory of the ntuples and of their file lists (overridden by the environment variable `HSCP_PROD_DIR`) |
 | `launch<Family>.sh`, `CONFIG` | absolute path of `cfg/configFile.txt` |
 | `macros/CombineHistos.C` | five absolute paths (search for `/safe/`) |
 

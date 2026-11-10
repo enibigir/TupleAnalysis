@@ -11,7 +11,7 @@
 #   cd python && python3 CreateSelector.py
 
 from Functions import *
-import pandas as pd
+import csv
 
 
 #######################################
@@ -20,9 +20,13 @@ import pandas as pd
 # Read config files
 #######################################
 
-df_HSCPsel = pd.read_csv("../cfg/HSCPpreSelections.csv",skipinitialspace=True)
+# list of (label, expression) pairs; the first line of the file is a header
+with open("../cfg/HSCPpreSelections.csv", newline='') as f:
+    rows = [row for row in csv.reader(f, skipinitialspace=True) if row]
+HSCPsel = [(row[0], row[1]) for row in rows[1:]]
 print('Selections are:')
-print(df_HSCPsel)
+for label, instruction in HSCPsel:
+    print('  '+label)
 
 # header files: template and new one
 h_temp = open("../macros/HSCPTemplate.h",'r')
@@ -33,7 +37,7 @@ for line in h_temp:
     h_out.write(line)
     #add code to declare data members corresponding to the HSCP preselections
     if line.find("ADD-HSCP-SELECTION")>0:
-        content = Code_HSCPSelectorProto(df_HSCPsel)
+        content = Code_HSCPSelectorProto(HSCPsel)
         h_out.write(content)
 
 h_out.close()
@@ -48,11 +52,11 @@ for line in c_temp:
     c_out.write(line)
     #add code for the HSCP preselection methods
     if line.find("ADD-SELECTION-METHODS")>0:
-        content = Code_HSCPSelectorImpl(df_HSCPsel)
+        content = Code_HSCPSelectorImpl(HSCPsel)
         c_out.write(content)
     #add code to add labels & members for HSCP preselection into vectors
     if line.find("FILL-SELECTION-VECTOR")>0:
-        content = Code_HSCPSelectorAddLabelsAndPointers2Vector(df_HSCPsel)
+        content = Code_HSCPSelectorAddLabelsAndPointers2Vector(HSCPsel)
         c_out.write(content)
 
 c_out.close()
