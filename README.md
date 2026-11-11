@@ -2,7 +2,7 @@
 
 Histogram production for the CMS Run 3 search for Heavy Stable Charged Particles (HSCP).
 
-The code runs a ROOT `TSelector` over the HSCP ntuples (tree `HSCPMiniAODAnalyzer/Events`) and writes, for each dataset, one ROOT file holding
+The code runs a ROOT `TSelector` over the HSCP ntuples (tree `HSCPMiniAODAnalyzer/Events`) and writes, for each sample, one ROOT file holding
 
 - control, cutflow, trigger-efficiency and signal-mass histograms, for each candidate selection;
 - the histograms of the regions A, B, C, D used by the data-driven background estimate.
@@ -16,19 +16,26 @@ I wrote all the code in this project myself. However, this README and the commen
 
 ## Requirements
 
-- ROOT 6, with `root-config` in the `PATH`. The code was developed inside `CMSSW_15_0_13_patch1`.
-- Python 3 (standard library only), to generate the selector.
+- ROOT 6. `source env.sh` uses the ROOT found in the `PATH`; without one, it sources the LCG view
+  from CVMFS matching the machine (el8 or el9, x86_64 or aarch64). No CMSSW is needed.
+- Python 3 (standard library only), to generate the selector and to drive HTCondor.
 - `numpy`, `uproot` and `matplotlib`, only for `python/DeriveSF.py`.
+- HTCondor (`condor_submit`), only to run on a batch farm.
 
 ## Quick start
 
 ```bash
+source env.sh                # ROOT in the PATH, or the LCG view from CVMFS
 ./compile.sh                 # builds libTools.so from src/ and inc/
-# activate one dataset: remove the leading # of one line of cfg/configFile.txt
-./launchGeneral.sh           # generates the selector and runs it on that dataset
+./tests/run_smoke.sh         # optional: whole chain on a synthetic ntuple, a few minutes
+./launch.sh --list '*'       # the samples known to cfg/datasets.json
+./launch.sh TestMET2024      # generates and compiles the selector, runs it on that sample
 ```
 
-The result is `macros/<dataset>_<version>.root`.
+The result is `output/<sample>.root`, with the log next to it.
+
+To run on HTCondor, see [`doc/condor_runbook.md`](doc/condor_runbook.md): every command from a
+fresh checkout to the merged histograms, in order.
 
 Before the first run, adapt the site-specific paths listed [below](#site-specific-paths).
 
@@ -36,15 +43,19 @@ Before the first run, adapt the site-specific paths listed [below](#site-specifi
 
 | Path | Content |
 |---|---|
-| `cfg/configFile.txt` | dataset to process, binning and pT cut |
+| `cfg/datasets.json` | the samples, where their ntuples are, their type and dataset, and the binning |
+| `env.sh` | provides ROOT: the one in the `PATH`, else an LCG view from CVMFS |
 | `cfg/HSCPpreSelections.csv` | candidate selections, one per row |
 | `src/`, `inc/` | helper library `libTools` (histogram containers, mass reconstruction, scale-factor readers); see [`doc/src_inc.md`](doc/src_inc.md) |
 | `inc/SF_*.txt` | the three trigger scale-factor tables read by the selector |
 | `compile.sh` | builds `libTools.so` |
-| `python/CreateSelector.py`, `python/Functions.py` | generate `macros/HSCPSelector.{h,C}` from the templates and the selection file |
+| `python/hscp/` | shared code of the tools: configuration files (`config.py`), selector generation (`selector.py`), running the driver (`driver.py`) |
+| `launch.sh`, `python/launch.py` | run the selector on samples chosen by name, pattern or dataset |
+| `python/CreateSelector.py` | generate `macros/HSCPSelector.{h,C}` by hand (the launcher and the submitter do it themselves) |
 | `macros/HSCPTemplate.{h,C}` | the analysis code: templates of the selector. **Edit these**, not `HSCPSelector.{h,C}`, which are regenerated at each launch |
-| `macros/macro.cc` | driver: reads the configuration, builds the chain of ntuples, runs the selector |
-| `launch*.sh` | run one dataset or a whole family of datasets |
+| `macros/macro.cc` | driver: builds the chain of the ntuples of a file list and runs the selector; called by `launch.sh` and the Condor jobs |
+| `condor/` | `submit.py`, `runJob.sh`, `merge.py`: run the samples as HTCondor jobs and merge the outputs |
+| `tests/` | unit tests of `python/hscp` (`test_hscp.py`) and the smoke test on a synthetic ntuple (`run_smoke.sh`) |
 | `macros/CombineHistos.C` | plotting macro, reads `output/` and writes `outputDisplay/` |
 | `python/DeriveSF.py` | computes the trigger scale factors and writes the three tables |
 | `output/` | where the plotting macros expect the selector outputs (content not tracked) |
@@ -54,9 +65,9 @@ Before the first run, adapt the site-specific paths listed [below](#site-specifi
 
 ```
 cfg/HSCPpreSelections.csv ─┐
-macros/HSCPTemplate.{h,C} ─┴─ python/CreateSelector.py ─► macros/HSCPSelector.{h,C}
+macros/HSCPTemplate.{h,C} ─┴─ python/hscp/selector.py ─► macros/HSCPSelector.{h,C}
 
-cfg/configFile.txt ─► macros/macro.cc ─► TChain of ntuples ─► HSCPSelector ─► macros/<dataset>_<version>.root
+cfg/datasets.json ─► launch.sh ─► macros/macro.cc ─► TChain of ntuples ─► HSCPSelector ─► output/<sample>.root
                                                                   ▲
                                              libTools.so, inc/SF_*.txt
 ```
@@ -65,16 +76,21 @@ For each event the selector evaluates the trigger and, for simulation, the weigh
 
 ## Configuration
 
-### `cfg/configFile.txt`
+### `cfg/datasets.json`
 
-One line per dataset; lines starting with `#` are ignored. Exactly one line should be active (if several are, the last one is used).
+One JSON file, read by `launch.sh` and `condor/submit.py` only (`macro.cc` receives a file list and the binning as arguments).
 
-| Column | Meaning |
+| Key | Meaning |
 |---|---|
-| pT cut | pT threshold in GeV separating regions A, B (below) from C, D (above) |
-| eta bins, ih bins, p bins, mass bins, FPIX bins | binning of the region histograms |
-| type | dataset name, as known to `macros/macro.cc` |
-| version | label of the run, used in the output file name. For the gluino samples it also selects the production |
+| `prod_dir` | directory of the ntuples and of their file lists; overridden by `--prod-dir` or the environment variable `HSCP_PROD_DIR` |
+| `binning` | default pT cut (`ptcut`, separating regions A, B from C, D) and bin counts `etabins`, `ihbins`, `pbins`, `massbins`, `fpixbins` of the region histograms |
+| `samples` | one entry per sample name, see below |
+
+A **sample** is one entry, for example `JetMET2024C`; a **dataset** is the group of samples it belongs to, for example `JetMET2024` for the eras C to I, or `Stop` for the mass points. Each sample has exactly one of `list` (a text file with one ROOT file per line) or `file` (a single ROOT file), relative to `prod_dir` unless absolute or a `root://` URL; a `type` among `data`, `mc` and `signal`; its `dataset`, used by `--dataset`; optionally `mass` (GeV, informative) and a `binning` object overriding any of the default keys.
+
+```json
+"Stop_Run3_MET_madgraph_700": {"file": "SIGNAL/V21p0/HSCP-Stop_Par-M-700_merged.root", "type": "signal", "dataset": "Stop", "mass": 700}
+```
 
 The binning drives the memory used: with 96 η, 400 Ih, 1000 p, 400 mass and 20 Fpix bins, the region histograms take about 1.8 GB **per selection**.
 
@@ -87,11 +103,11 @@ The first row is a header. Each following row is `label, expression`:
 
 A row whose label starts with `#` is skipped.
 
-### Datasets
+### Samples
 
-`knownInputs()` in `macros/macro.cc` is the list of valid dataset names and of where their ntuples are. Paths are relative to the production directory.
+The samples of `cfg/datasets.json`, by dataset:
 
-| Dataset name | Ntuples |
+| Sample name | Ntuples |
 |---|---|
 | `JetMET2024C` … `JetMET2024I` | file lists `JetMET2024/V12p310.txt` … `V12p316.txt` |
 | `Mu2024C` … `Mu2024I` | file lists `Mu2024/V18p100.txt` … `V18p106.txt` |
@@ -99,8 +115,8 @@ A row whose label starts with `#` is skipped.
 | `QCD2024_mu_pt15to20` … `QCD2024_mu_pt1000` | file lists `BKG/QCD2024/V16p21.txt` … `V16p212.txt` |
 | `Wjets2024_1J_pt40to100` … `Wjets2024_2J_pt600` | file lists `BKG/Wjets2024/V14p601.txt` … `V14p6010.txt` |
 | `WjetMuNu2024`, `TTbar2024`, `TTbarSemiLep2024` | one file list each |
-| `Gluino_Run3_MET_pythia_<mass>` | one ROOT file per mass, version `V19p0` only |
-| `Gluino_Run3_MET_madgraph_<mass>` | one ROOT file per mass, versions `V19p6` to `V19p12` |
+| `Gluino_Run3_MET_pythia_<mass>` | one ROOT file per mass (`CodeV19p0` production) |
+| `Gluino_Run3_MET_madgraph_<mass>` | one ROOT file per mass (`V19p6` production) |
 | `Gluino_Run2_MET_madgraph_2000` | one ROOT file |
 | `Stau_Run3_MET_<mass>`, `Stop_Run3_MET_madgraph_<mass>` | one ROOT file per mass |
 | `TestMET2024`, `TestMuon2024`, `TestMuonEG`, `TestTTbar2024`, `TestWjets`, `TestWjetsMuNu` | short file lists, for tests |
@@ -109,22 +125,28 @@ A file list is a text file with one ROOT file per line.
 
 ## Running
 
-| Script | What it runs |
-|---|---|
-| `launchGeneral.sh` | the active line of `cfg/configFile.txt` |
-| `launchJetMET2024.sh`, `launchMu2024.sh`, `launchMuonEG.sh` | every era of the data stream, one after the other |
-| `launchQCD.sh`, `launchWjets.sh` | every bin of the simulated sample |
-| `launchGluinoMadgraph.sh`, `launchGluinoPythia.sh`, `launchStauRun3.sh`, `launchStopRun3.sh` | every mass point of the signal |
+```bash
+./launch.sh 'JetMET2024*'                        # every era of the data stream
+./launch.sh --dataset QCD2024 --dataset Wjets2024 --jobs 3   # three samples at a time, one thread each
+./launch.sh 'Gluino_Run3_MET_madgraph_*' --out-dir output/Gluino_V20 --label V20
+./launch.sh TestMET2024 --dry-run                # print the root commands only
+./launch.sh --list '*'                           # names and binning
+```
 
-All scripts regenerate the selector first, and must be started from the root of the repository.
+Samples are chosen by name or `fnmatch` pattern, or whole datasets with `--dataset`, in `cfg/datasets.json`. The selector is generated from `cfg/HSCPpreSelections.csv` (or `--selections`) and compiled once; each sample then runs in its own `root` process, writing `<out-dir>/<sample>[_<label>].root`, the file list it used (`.files`) and a `.log` next to it. The script stops at the first failure unless `--keep-going` is given, and exits non-zero if any sample failed. `launch.sh` sources `env.sh` and calls `python/launch.py`, which can be used directly once ROOT is in the `PATH`.
 
-The family scripts rewrite `cfg/configFile.txt` in place: they look for the **commented** lines of their family, activate them one at a time and comment everything else. Leave the dataset lines commented before using them.
+`macro.cc` can also be called directly, which is what the launcher and the Condor jobs do:
 
-`TTbar2024`, `TTbarSemiLep2024`, `WjetMuNu2024`, `Gluino_Run2_MET_madgraph_2000` and the test samples have no family script: activate their line and use `launchGeneral.sh`.
+```bash
+cd macros
+root -l -b -q 'macro.cc("JetMET2024C","JetMET2024C.files","JetMET2024C.root",true,70,96,400,1000,400,20)'
+```
+
+sample name, file list, output file, whether to write the no-selection histograms, then the pT cut and the five binnings; `./launch.sh <sample> --dry-run` prints the exact command. `HSCP_NTHREADS` sets the number of implicit-MT threads (default 4).
 
 ## Output file
 
-`macros/<dataset>_<version>.root` contains flat histograms, without directories.
+`<out-dir>/<sample>[_<label>].root` contains flat histograms, without directories. Use `--out-dir` and `--label` to keep several runs of the same sample apart; the plotting macros read `output/<family>_V<n>/`.
 
 | Name | Content |
 |---|---|
@@ -136,7 +158,7 @@ Regions A and B are filled by candidates with pT below the cut, regions C and D 
 
 For data, several histograms are only filled by candidates with Fpix ≤ 0.9, to keep the signal region blind.
 
-The mass is computed from the momentum and `Ih` as `m = p · sqrt((Ih − C) / K)`. `K` and `C` are chosen from the dataset name at the beginning of `HSCPSelector::SlaveBegin`: one pair for 2024 data, one for simulation.
+The mass is computed from the momentum and `Ih` as `m = p · sqrt((Ih − C) / K)`. `K` and `C` are chosen from the sample name at the beginning of `HSCPSelector::SlaveBegin`: one pair for 2024 data, one for simulation.
 
 The list and binning of the region histograms are documented in [`doc/src_inc.md`](doc/src_inc.md).
 
@@ -165,14 +187,16 @@ The format of the tables is described in [`doc/src_inc.md`](doc/src_inc.md).
 
 | Where | What |
 |---|---|
-| `macros/macro.cc`, `kDefaultProdDir` | directory of the ntuples and of their file lists (overridden by the environment variable `HSCP_PROD_DIR`) |
-| `launch<Family>.sh`, `CONFIG` | absolute path of `cfg/configFile.txt` |
+| `cfg/datasets.json`, `prod_dir` | directory of the ntuples and of their file lists (overridden by the environment variable `HSCP_PROD_DIR` or `--prod-dir`) |
+| `env.sh` | LCG release and platform of the CVMFS view used when no ROOT is installed |
 | `macros/CombineHistos.C` | five absolute paths (search for `/safe/`) |
+
+The selector reads the scale-factor tables from `HSCP_SF_DIR` (default `inc/`).
 
 ## Extending the analysis
 
-- **New dataset**: add its name and location in `knownInputs()` (`macros/macro.cc`) and a line in `cfg/configFile.txt`. The selector decides from the dataset name which trigger to require, whether the sample is simulation or signal, and which `K` and `C` to use: check the `dataset_.find(...)` conditions in `HSCPTemplate.C`.
+- **New sample**: add an entry in `cfg/datasets.json`. The selector decides from the sample name which trigger to require, whether the sample is simulation or signal, and which `K` and `C` to use: check the `sample_.find(...)` conditions in `HSCPTemplate.C`.
 - **New selection**: add a row to `cfg/HSCPpreSelections.csv`. No code change is needed.
 - **New histogram**: book it with `AddHisto1F` / `AddHisto2F` in `SlaveBegin` and fill it with `FillHisto1F` / `FillHisto2F` in `Process`, both in `HSCPTemplate.C`. The two names must match exactly: a fill with an unknown name is silently ignored.
-- **New branch**: declare a `TTreeReaderValue` or `TTreeReaderArray` in `HSCPTemplate.h`.
+- **New branch**: declare a `TTreeReaderValue` or `TTreeReaderArray` in `HSCPTemplate.h`, then run `python3 tests/make_synthetic_source.py` so the synthetic ntuple of the smoke test gets the branch too.
 - Any change in `src/` or `inc/` requires `./compile.sh`.

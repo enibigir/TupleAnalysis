@@ -143,7 +143,7 @@ All public.
 2. Copies `suffix` into `suffix_`.
 3. Calls `initHisto(etabins, ihbins, pbins, massbins, fpixbins, C_parameter)`.
 
-The selector passes the bin counts of `cfg/configFile.txt` and its `C` value as `C_parameter`.
+The selector passes the bin counts of `cfg/datasets.json` and its `C` value as `C_parameter`.
 
 ### `void initHisto(etabins, ihbins, pbins, massbins, fpixbins, C_parameter)`
 
@@ -169,7 +169,7 @@ It is public but meant for the constructor only: a second call replaces the 26 p
 | npv | 100 | 0 – 100 |
 | σ(pT)/pT | `np` in `eta_pterrOpt`, 100 in `pt_pterroverpt` | 0 – 1 |
 
-The bin counts come from `cfg/configFile.txt` (currently η 96, Ih 400, p 1000, mass 400, Fpix 20). With these values one `RegionMassPlot` takes about 38 MB: each cell holds a `float` content and a `double` sum of squared weights.
+The bin counts come from `cfg/datasets.json` (currently η 96, Ih 400, p 1000, mass 400, Fpix 20). With these values one `RegionMassPlot` takes about 38 MB: each cell holds a `float` content and a `double` sum of squared weights.
 
 ### `void fill(eta, nhits, p, pt, pterr, ih, ias, m, npv, fpix, w)`
 

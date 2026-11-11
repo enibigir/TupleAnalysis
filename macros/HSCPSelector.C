@@ -5,9 +5,13 @@
 #include <TH1.h>
 #include <functional>
 #include <cmath>
+#include <cstdlib>
+#include <map>
+#include <sstream>
+#include <stdexcept>
 
 
-//K and C values are set based on the config file dataset name (see below)
+//K and C values are set based on the sample name (see SlaveBegin)
 float K(2.54), C(3.14); 
 float K_bckg2024(2.83894), C_bckg2024(3.01756); //MC background 2024
 float K_data2024(2.8202), C_data2024(2.9784); //Data 2024
@@ -19,7 +23,7 @@ float K_data2024(2.8202), C_data2024(2.9784); //Data 2024
 
 //ADD-SELECTION-METHODS
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta2p4(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -27,7 +31,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta2p4(int i){
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta1(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -35,7 +39,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta1(int i){
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta1_2p4(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -43,7 +47,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta1_2p4(int i){
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta2p4(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -51,7 +55,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta2p4(int
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta1(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -59,7 +63,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta1(int i
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta1_2p4(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -67,7 +71,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta1_2p4(i
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta2p4(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -75,7 +79,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta1(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -83,7 +87,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta1_2p4(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -91,7 +95,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta2p4(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -99,7 +103,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -107,7 +111,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1_2p4(int i){
-   if (i<0 || i>(int)Pt.GetSize()) {
+   if (i<0 || i>=(int)Pt.GetSize()) {
       cout << i << endl;
       return false;
    }
@@ -116,21 +120,36 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
 
 
 
+// The option string given by macro.cc is a list of key=value pairs separated by commas:
+//   ptcut, etabins, ihbins, pbins, massbins, fpixbins, sample, out (output file), nosel (0 or 1)
+std::map<std::string, std::string> HSCPSelector::parseOptions() const {
+    std::map<std::string, std::string> opt;
+    std::stringstream ss(GetOption());
+    for (std::string item; std::getline(ss, item, ','); ) {
+        const size_t eq = item.find('=');
+        if (eq == std::string::npos) continue;
+        opt[item.substr(0, eq)] = item.substr(eq + 1);
+    }
+    for (const char* key : {"ptcut", "etabins", "ihbins", "pbins", "massbins", "fpixbins", "sample"}) {
+        if (!opt.count(key)) throw std::runtime_error(std::string("HSCPSelector: option '") + key + "' missing in \"" + GetOption() + "\"");
+    }
+    return opt;
+}
+
+
 void HSCPSelector::Begin(TTree *tree) {
-    TString option = GetOption();
-    TObjArray *tx = option.Tokenize(",");
+    std::map<std::string, std::string> opt = parseOptions();
 
-    // Output file
-    oFile_ = ((TObjString *)(tx->At(6)))->String().Data();
-    oFile_ += "_";
-    oFile_ += ((TObjString *)(tx->At(7)))->String().Data();
-    oFile_ += ".root";
+    oFile_ = (opt.count("out") && !opt["out"].empty()) ? opt["out"] : opt["sample"] + ".root";
+    fillNosel_ = !(opt.count("nosel") && opt["nosel"] == "0");
 
 
-    // Fill the SF;    
-    loadSF2D("../inc/SF_orMETtrg_PUppiMET_VS_PseudoMET__TriggerEffCalib_table_plain.txt", SF2D_PseudoMETlovalue, SF2D_PseudoMEThivalue, SF2D_PUppiMETlovalue, SF2D_PUppiMEThivalue, SF2D_Down, SF2D, SF2D_Up);
-    loadSF1D("../inc/SF_PseudoMET.txt", SF1D_PseudoMETvalue, SF1Dpseudo_Down, SF1Dpseudo, SF1Dpseudo_Up);
-    loadSF1D("../inc/SF_PUppiMET.txt", SF1D_PUppiMETvalue, SF1Dpuppi_Down, SF1Dpuppi, SF1Dpuppi_Up);
+    // Trigger scale-factor tables: directory HSCP_SF_DIR, default ../inc (relative to macros/)
+    std::string sfDir = "../inc";
+    if (const char* env = std::getenv("HSCP_SF_DIR")) { if (*env) sfDir = env; }
+    loadSF2D(sfDir + "/SF_orMETtrg_PUppiMET_VS_PseudoMET__TriggerEffCalib_table_plain.txt", SF2D_PseudoMETlovalue, SF2D_PseudoMEThivalue, SF2D_PUppiMETlovalue, SF2D_PUppiMEThivalue, SF2D_Down, SF2D, SF2D_Up);
+    loadSF1D(sfDir + "/SF_PseudoMET.txt", SF1D_PseudoMETvalue, SF1Dpseudo_Down, SF1Dpseudo, SF1Dpseudo_Up);
+    loadSF1D(sfDir + "/SF_PUppiMET.txt", SF1D_PUppiMETvalue, SF1Dpuppi_Down, SF1Dpuppi, SF1Dpuppi_Up);
 
 
     //FILL-SELECTION-VECTOR
@@ -180,37 +199,28 @@ selLabels_.push_back("METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1
 
 
 void HSCPSelector::SlaveBegin(TTree *tree) {
-    TString option = GetOption();
-    TObjArray *tx = option.Tokenize(",");
+    std::map<std::string, std::string> opt = parseOptions();
 
-    
-    std::string ptTmp( ((TObjString *)(tx->At(0)))->String().Data());
-    ptcut_ = std::stod(ptTmp);
-    std::string etaTmp( ((TObjString *)(tx->At(1)))->String().Data());
-    etabins_ = std::stoi(etaTmp);
-    std::string ihTmp( ((TObjString *)(tx->At(2)))->String().Data());
-    ihbins_ = std::stoi(ihTmp); 
-    std::string pTmp( ((TObjString *)(tx->At(3)))->String().Data());
-    pbins_ = std::stoi(pTmp);
-    std::string massTmp( ((TObjString *)(tx->At(4)))->String().Data());
-    massbins_ = std::stoi(massTmp);
-    std::string fpixCutTmp( ((TObjString *)(tx->At(5)))->String().Data());
-    fpixbins_ = std::stoi(fpixCutTmp);
-    std::string dataset( ((TObjString *)(tx->At(6)))->String().Data());
-    dataset_ = dataset;
+    ptcut_    = std::stod(opt["ptcut"]);
+    etabins_  = std::stoi(opt["etabins"]);
+    ihbins_   = std::stoi(opt["ihbins"]);
+    pbins_    = std::stoi(opt["pbins"]);
+    massbins_ = std::stoi(opt["massbins"]);
+    fpixbins_ = std::stoi(opt["fpixbins"]);
+    sample_   = opt["sample"];
 
 
-    if(dataset_.find("2024") != std::string::npos) {
+    if(sample_.find("2024") != std::string::npos) {
         K = K_data2024;
         C = C_data2024;
     }
-    if (dataset_.find("Gluino") != std::string::npos ||
-        dataset_.find("Stau") != std::string::npos ||
-        dataset_.find("Stop") != std::string::npos ||
-        dataset_.find("QCD") != std::string::npos || 
-        dataset_.find("Wjets") != std::string::npos ||
-        dataset_.find("WjetMuNu") != std::string::npos ||
-        dataset_.find("TTbar") != std::string::npos) {
+    if (sample_.find("Gluino") != std::string::npos ||
+        sample_.find("Stau") != std::string::npos ||
+        sample_.find("Stop") != std::string::npos ||
+        sample_.find("QCD") != std::string::npos || 
+        sample_.find("Wjets") != std::string::npos ||
+        sample_.find("WjetMuNu") != std::string::npos ||
+        sample_.find("TTbar") != std::string::npos) {
         K = K_bckg2024;
         C = C_bckg2024;
     }
@@ -898,9 +908,9 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
     bool METfilters = false;
 
     bool isMC = false;
-    bool isSignal = (dataset_.find("Gluino") != std::string::npos) || 
-                    (dataset_.find("Stop") != std::string::npos) || 
-                    (dataset_.find("Stau") != std::string::npos) ? true : false;
+    bool isSignal = (sample_.find("Gluino") != std::string::npos) || 
+                    (sample_.find("Stop") != std::string::npos) || 
+                    (sample_.find("Stau") != std::string::npos) ? true : false;
 
     float AppliedWeight = 1.;
     float AppliedWeight_SF_Up = 1., AppliedWeight_SF_Down = 1.;
@@ -908,20 +918,20 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
 
     float AppliedWeight1Dpseudo = 1., AppliedWeight1Dpseudo_SF_Down = 1., AppliedWeight1Dpseudo_SF_Up = 1.;
     float AppliedWeight1Dpuppi = 1., AppliedWeight1Dpuppi_SF_Down = 1., AppliedWeight1Dpuppi_SF_Up = 1.;
-    if (dataset_.find("Mu2024") != std::string::npos ||
-        dataset_.find("TestMuon2024") != std::string::npos) {
+    if (sample_.find("Mu2024") != std::string::npos ||
+        sample_.find("TestMuon2024") != std::string::npos) {
         trigger = *HLT_Mu50;
         METfilters = true; // no MET filters in muon datasets
     }
-    else if (dataset_.find("MET") != std::string::npos || 
-             dataset_.find("QCD2024") != std::string::npos || 
-             dataset_.find("TTbar2024") != std::string::npos ||
-             dataset_.find("TTbarSemiLep2024") != std::string::npos ||
-             dataset_.find("Wjets") != std::string::npos ||
-             dataset_.find("Gluino") != std::string::npos ||
-             dataset_.find("Stop") != std::string::npos || 
-             dataset_.find("Stau") != std::string::npos ||
-             dataset_.find("WjetMuNu") != std::string::npos) {
+    else if (sample_.find("MET") != std::string::npos || 
+             sample_.find("QCD2024") != std::string::npos || 
+             sample_.find("TTbar2024") != std::string::npos ||
+             sample_.find("TTbarSemiLep2024") != std::string::npos ||
+             sample_.find("Wjets") != std::string::npos ||
+             sample_.find("Gluino") != std::string::npos ||
+             sample_.find("Stop") != std::string::npos || 
+             sample_.find("Stau") != std::string::npos ||
+             sample_.find("WjetMuNu") != std::string::npos) {
         
         triggerONLY     = ( *HLT_PFMET120_PFMHT120_IDTight || *HLT_PFHT500_PFMET100_PFMHT100_IDTight ||
                         *HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 || *HLT_MET105_IsoTrk50);
@@ -934,14 +944,14 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
 
         METfilters = Flag_allMETFilters[0];
     }
-    if (dataset_.find("Gluino") != std::string::npos ||
-        dataset_.find("Stop") != std::string::npos || 
-        dataset_.find("Stau") != std::string::npos ||
-        dataset_.find("QCD2024") != std::string::npos || 
-        dataset_.find("TTbar2024") != std::string::npos ||
-        dataset_.find("TTbarSemiLep2024") != std::string::npos ||
-        dataset_.find("Wjets") != std::string::npos ||
-        dataset_.find("WjetMuNu") != std::string::npos) {
+    if (sample_.find("Gluino") != std::string::npos ||
+        sample_.find("Stop") != std::string::npos || 
+        sample_.find("Stau") != std::string::npos ||
+        sample_.find("QCD2024") != std::string::npos || 
+        sample_.find("TTbar2024") != std::string::npos ||
+        sample_.find("TTbarSemiLep2024") != std::string::npos ||
+        sample_.find("Wjets") != std::string::npos ||
+        sample_.find("WjetMuNu") != std::string::npos) {
         isMC = true;
 
 
@@ -2330,7 +2340,11 @@ void HSCPSelector::SlaveTerminate() {
     std::cout << std::endl;
     cout << "Object are saved" << endl;
     for(auto obj: vcp) obj.AddToList(fOutput);
-    for(auto obj: vcp_nosel) obj.AddToList(fOutput);
+    // The no-selection histograms (cutflows, Nm1_*, Nosel_*, ...) do not depend on the selections.
+    // When the selections of a sample are split over several jobs, only one job writes them,
+    // otherwise they would be counted several times by hadd.
+    if (fillNosel_) for(auto obj: vcp_nosel) obj.AddToList(fOutput);
+    else std::cout << "No-selection histograms not written (fillNosel = 0)" << std::endl;
 
     for(auto obj: vmrp_regionA_3f4) obj.addToList(fOutput);
     for(auto obj: vmrp_regionA_3f6) obj.addToList(fOutput);

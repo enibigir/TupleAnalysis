@@ -13,6 +13,7 @@
 #include <iostream>
 #include <limits>
 #include <fstream>
+#include <map>
 #include "ROOT/RConfig.hxx"
 #include "TObjString.h"
 
@@ -60,8 +61,9 @@ bool PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1_2
    int massbins_;
    int fpixbins_;
    double ptcut_;
-   std::string dataset_;
+   std::string sample_;     // name of the sample, chooses the triggers and the K/C constants
    std::string oFile_;
+   bool fillNosel_ = true;   // write the histograms made without selection (see macro.cc)
    std::vector<bool (HSCPSelector::*)(int)> selections_;
    std::vector<string> selLabels_;
    std::vector<CPlots> vcp;
@@ -327,6 +329,7 @@ bool PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1_2
    virtual TList   *GetOutputList() const { return fOutput; }
    virtual void    SlaveTerminate();
    virtual void    Terminate();
+   std::map<std::string, std::string> parseOptions() const;   // key=value pairs of the option string
 
    ClassDef(HSCPSelector,0);
 };
