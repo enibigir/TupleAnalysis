@@ -25,7 +25,7 @@ CFG_DIR = os.path.join(REPO, "cfg")
 MACROS_DIR = os.path.join(REPO, "macros")
 INC_DIR = os.path.join(REPO, "inc")
 DATASETS_FILE = os.path.join(CFG_DIR, "datasets.json")
-SELECTIONS_FILE = os.path.join(CFG_DIR, "HSCPpreSelections.csv")
+SELECTIONS_FILE = os.path.join(CFG_DIR, "selections.json")
 
 Binning = namedtuple("Binning", "ptcut etabins ihbins pbins massbins fpixbins")
 TYPES = ("data", "mc", "signal")

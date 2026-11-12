@@ -1,5 +1,6 @@
 """Unit tests of the python/hscp package. No ROOT needed:  python3 -m unittest discover -s tests -v"""
 
+import json
 import os
 import sys
 import tempfile
@@ -113,23 +114,50 @@ class ConfigTests(unittest.TestCase):
 
 
 class SelectorTests(unittest.TestCase):
+    def _write(self, doc):
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            if isinstance(doc, str):
+                f.write(doc)
+            else:
+                json.dump(doc, f)
+        self.addCleanup(os.remove, f.name)
+        return f.name
+
     def test_repository_selection_file(self):
         sels = selector.read_selections()
         self.assertEqual(len(sels), 12)
-        self.assertTrue(all(selector.IDENT.match(l) for l, _ in sels))
+        self.assertTrue(all(selector.IDENT.match(s.label) for s in sels))
+        for s in sels:                                   # the common cuts come first, then the specific ones
+            self.assertEqual(s.cuts[0], "Flag_allMETFilters[0] == true")
+            self.assertEqual(s.cuts[-1][:12], "ptOverptErr[")
 
-    def test_rejects_comma_in_expression_and_bad_label(self):
-        for body in ("good, (Pt[i] > 50, Eta[i] < 1)\n", "bad-label, (Pt[i] > 50)\n"):
-            with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
-                f.write("selections, true\n" + body)
-            try:
-                with self.assertRaises(selector.SelectionError):
-                    selector.read_selections(f.name)
-            finally:
-                os.remove(f.name)
+    def test_common_cuts_object_form_and_disabled(self):
+        doc = {"common": ["Pt[i] > 50"],
+               "selections": {"a": ["Eta[i] < 1"],
+                              "b": {"cuts": ["Eta[i] < 2"], "comment": "object form"},
+                              "c": {"cuts": ["Eta[i] < 3"], "enabled": False},
+                              "_note": "ignored"}}
+        self.assertEqual(selector.read_selections(self._write(doc)),
+                         [("a", ["Pt[i] > 50", "Eta[i] < 1"]), ("b", ["Pt[i] > 50", "Eta[i] < 2"])])
+        self.assertEqual(selector.expression(["Pt[i] > 50", "Eta[i] < 1"]), "(Pt[i] > 50) && (Eta[i] < 1)")
+
+    def test_rejects_bad_files(self):
+        bad = ('{"selections": {"a": ["x"]',                                   # not JSON
+               {"selections": {"bad-label": ["x"]}},
+               {"selections": {"a": []}},
+               {"selections": {"a": ["x", 3]}},
+               {"selections": {"a": {"enabled": True}}},                      # no cuts
+               {"selections": {"a": {"cuts": ["x"], "typo": 1}}},
+               {"selections": {"a": ["x"]}, "commmon": ["y"]},
+               {"selections": {"a": {"cuts": ["x"], "enabled": False}}},      # nothing active
+               {"common": ["x"]},                                             # no selections
+               ["a"])
+        for doc in bad:
+            with self.assertRaises(selector.SelectionError, msg=repr(doc)):
+                selector.read_selections(self._write(doc))
 
     def test_generate_inserts_each_selection(self):
-        sels = [("selA", "(Pt[i] > 50.0)"), ("selB", "(Eta[i] < 1.0)")]
+        sels = [("selA", ["Pt[i] > 50.0"]), ("selB", ["Eta[i] < 1.0", "Pt[i] > 60"])]
         with tempfile.TemporaryDirectory() as d:
             h, c = selector.generate(sels, d)
             with open(h) as fh, open(c) as fc:
@@ -140,16 +168,13 @@ class SelectorTests(unittest.TestCase):
                 self.assertIn(f'selLabels_.push_back("{label}");', src)
             self.assertIn("i>=(int)Pt.GetSize()", src)
             self.assertIn("return (Pt[i] > 50.0);", src)
+            self.assertIn("return (Eta[i] < 1.0) && (Pt[i] > 60);", src)
 
     def test_write_then_read_round_trip(self):
-        sels = [("a", "(x)"), ("b", "(y && z)")]
-        with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
-            pass
-        try:
-            selector.write_selections(sels, f.name)
-            self.assertEqual(selector.read_selections(f.name), sels)
-        finally:
-            os.remove(f.name)
+        sels = [selector.Selection("a", ["x"]), selector.Selection("b", ["y", "z"])]
+        path = self._write("")
+        selector.write_selections(sels, path)
+        self.assertEqual(selector.read_selections(path), sels)
 
 
 class DriverTests(unittest.TestCase):

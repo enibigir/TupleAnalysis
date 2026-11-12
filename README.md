@@ -45,7 +45,7 @@ Before the first run, adapt the site-specific paths listed [below](#site-specifi
 |---|---|
 | `cfg/datasets.json` | the samples, where their ntuples are, their type and dataset, and the binning |
 | `env.sh` | provides ROOT: the one in the `PATH`, else an LCG view from CVMFS |
-| `cfg/HSCPpreSelections.csv` | candidate selections, one per row |
+| `cfg/selections.json` | the cuts common to every selection, and the candidate selections with their own cuts |
 | `src/`, `inc/` | helper library `libTools` (histogram containers, mass reconstruction, scale-factor readers); see [`doc/src_inc.md`](doc/src_inc.md) |
 | `inc/SF_*.txt` | the three trigger scale-factor tables read by the selector |
 | `compile.sh` | builds `libTools.so` |
@@ -64,7 +64,7 @@ Before the first run, adapt the site-specific paths listed [below](#site-specifi
 ## Processing chain
 
 ```
-cfg/HSCPpreSelections.csv ─┐
+cfg/selections.json       ─┐
 macros/HSCPTemplate.{h,C} ─┴─ python/hscp/selector.py ─► macros/HSCPSelector.{h,C}
 
 cfg/datasets.json ─► launch.sh ─► macros/macro.cc ─► TChain of ntuples ─► HSCPSelector ─► output/<sample>.root
@@ -94,14 +94,23 @@ A **sample** is one entry, for example `JetMET2024C`; a **dataset** is the group
 
 The binning drives the memory used: with 96 η, 400 Ih, 1000 p, 400 mass and 20 Fpix bins, the region histograms take about 1.8 GB **per selection**.
 
-### `cfg/HSCPpreSelections.csv`
+### `cfg/selections.json`
 
-The first row is a header. Each following row is `label, expression`:
+```json
+{
+  "common": ["Flag_allMETFilters[0] == true", "Pt[i] > 50.0", "...", "Ih_Strip[i] > C"],
+  "selections": {
+    "METanalysis_TestPUppiMETCut_Eta2p4": ["std::abs(Eta[i]) < 2.4", "EoP[i] < 0.3", "ptOverptErr[i] < 1"],
+    "METanalysis_TestPUppiMETCut_Eta1":   {"cuts": ["std::abs(Eta[i]) < 1", "EoP[i] < 0.3", "ptOverptErr[i] < 1"],
+                                           "enabled": false, "comment": "barrel only, kept for reference"}
+  }
+}
+```
 
-- `label` names the selection and prefixes its histograms;
-- `expression` is a C++ boolean expression written with the branch readers declared in `macros/HSCPTemplate.h` and the candidate index `i`, for instance `(Pt[i] > 50.0) && (std::abs(Eta[i]) < 2.4)`. It must not contain a comma.
+- `common` lists the cuts applied by every selection;
+- `selections` maps a label to the cuts specific to that selection. The label names the selection and prefixes its histograms, so it must be a C++ identifier. A selection is either its list of cuts, or an object with `cuts` and the optional `enabled` (default `true`) and `comment`; a disabled selection is skipped.
 
-A row whose label starts with `#` is skipped.
+A cut is a C++ boolean expression written with the branch readers declared in `macros/HSCPTemplate.h` and the candidate index `i`. The generated method returns the AND of the common cuts and of the selection's own cuts, each in parentheses, common ones first. Keys starting with `_` are ignored.
 
 ### Samples
 
@@ -133,7 +142,7 @@ A file list is a text file with one ROOT file per line.
 ./launch.sh --list '*'                           # names and binning
 ```
 
-Samples are chosen by name or `fnmatch` pattern, or whole datasets with `--dataset`, in `cfg/datasets.json`. The selector is generated from `cfg/HSCPpreSelections.csv` (or `--selections`) and compiled once; each sample then runs in its own `root` process, writing `<out-dir>/<sample>[_<label>].root`, the file list it used (`.files`) and a `.log` next to it. The script stops at the first failure unless `--keep-going` is given, and exits non-zero if any sample failed. `launch.sh` sources `env.sh` and calls `python/launch.py`, which can be used directly once ROOT is in the `PATH`.
+Samples are chosen by name or `fnmatch` pattern, or whole datasets with `--dataset`, in `cfg/datasets.json`. The selector is generated from `cfg/selections.json` (or `--selections`) and compiled once; each sample then runs in its own `root` process, writing `<out-dir>/<sample>[_<label>].root`, the file list it used (`.files`) and a `.log` next to it. The script stops at the first failure unless `--keep-going` is given, and exits non-zero if any sample failed. `launch.sh` sources `env.sh` and calls `python/launch.py`, which can be used directly once ROOT is in the `PATH`.
 
 `macro.cc` can also be called directly, which is what the launcher and the Condor jobs do:
 
@@ -196,7 +205,7 @@ The selector reads the scale-factor tables from `HSCP_SF_DIR` (default `inc/`).
 ## Extending the analysis
 
 - **New sample**: add an entry in `cfg/datasets.json`. The selector decides from the sample name which trigger to require, whether the sample is simulation or signal, and which `K` and `C` to use: check the `sample_.find(...)` conditions in `HSCPTemplate.C`.
-- **New selection**: add a row to `cfg/HSCPpreSelections.csv`. No code change is needed.
+- **New selection**: add an entry to `selections` in `cfg/selections.json`; a cut for every selection goes in `common`. No code change is needed.
 - **New histogram**: book it with `AddHisto1F` / `AddHisto2F` in `SlaveBegin` and fill it with `FillHisto1F` / `FillHisto2F` in `Process`, both in `HSCPTemplate.C`. The two names must match exactly: a fill with an unknown name is silently ignored.
 - **New branch**: declare a `TTreeReaderValue` or `TTreeReaderArray` in `HSCPTemplate.h`, then run `python3 tests/make_synthetic_source.py` so the synthetic ntuple of the smoke test gets the branch too.
 - Any change in `src/` or `inc/` requires `./compile.sh`.

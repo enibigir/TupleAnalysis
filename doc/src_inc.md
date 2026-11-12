@@ -248,7 +248,7 @@ Steps:
 
 The profiles use the Y bins inside the axis range only: entries in the Y underflow and overflow do not enter the mean.
 
-One call therefore puts 31 objects in the list. The derived objects are a snapshot taken at the time of the call. There is no test on `list`, which must not be null. No selection of the current `cfg/HSCPpreSelections.csv` has `CalibPseudoMET` in its label, so nothing is skipped for that reason today.
+One call therefore puts 31 objects in the list. The derived objects are a snapshot taken at the time of the call. There is no test on `list`, which must not be null. No selection of the current `cfg/selections.json` has `CalibPseudoMET` in its label, so nothing is skipped for that reason today.
 
 ### `~RegionMassPlot()`
 

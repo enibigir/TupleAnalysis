@@ -34,7 +34,7 @@ If the ntuples are on storage that the worker nodes cannot mount, the file lists
 ## 3. Check the selections and the binning
 
 ```bash
-cat cfg/HSCPpreSelections.csv      # one selection per row; memory is about 1.7 GB per selection
+cat cfg/selections.json            # the cuts and the selections; memory is about 1.7 GB per selection
 ./launch.sh --list 'JetMET2024*'   # the samples, their type, dataset and binning, from cfg/datasets.json
 ```
 

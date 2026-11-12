@@ -18,7 +18,7 @@ python3 -m unittest discover -s tests
 echo "== 1. libTools"
 ./compile.sh
 
-echo "== 2. selector from cfg/HSCPpreSelections.csv"
+echo "== 2. selector from cfg/selections.json"
 python3 python/CreateSelector.py > /dev/null
 
 echo "== 3. synthetic ntuples"

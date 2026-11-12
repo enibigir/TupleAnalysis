@@ -61,7 +61,7 @@ void MakeSyntheticNtuple(const char* fileName = "synthetic.root", int seed = 0) 
 {NL.join("    " + r for r in reset)}
     }};
 
-    // One good track: every cut of cfg/HSCPpreSelections.csv passes (data K/C: C = 2.9784)
+    // One good track: every cut of cfg/selections.json passes (data K/C: C = 2.9784)
     auto addGoodTrack = [&](double pt, float fpix) {{
         HSCP_type.push_back(0); HSCP_hasTrack.push_back(true); PF_type.push_back(211);
         P.push_back(pt * 1.1276);  Pt.push_back(pt); Pterr.push_back(0.05 * pt); Eta.push_back(0.5); Phi.push_back(1.0);

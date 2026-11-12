@@ -38,7 +38,7 @@ REPO = config.REPO
 
 def _mk(d):
     os.makedirs(os.path.join(d, "macros"), exist_ok=True)
-    return os.path.join(d, "HSCPpreSelections.csv")
+    return os.path.join(d, "selections.json")
 
 
 # ----------------------------------------------------------------------
@@ -84,7 +84,7 @@ def main():
     groups = list(config.chunked(sels, args.selections_per_job))
     for g, group in enumerate(groups):
         gdir = os.path.join(work, "sel", f"g{g}")
-        selector.write_selections(group, os.path.join(gdir, "HSCPpreSelections.csv") if os.path.isdir(gdir) else _mk(gdir))
+        selector.write_selections(group, os.path.join(gdir, "selections.json") if os.path.isdir(gdir) else _mk(gdir))
         selector.generate(group, os.path.join(gdir, "macros"))
         shutil.copy(os.path.join(config.MACROS_DIR, "macro.cc"), os.path.join(gdir, "macros", "macro.cc"))
     print(f"{len(sels)} selections in {len(groups)} group(s) of up to {args.selections_per_job}")

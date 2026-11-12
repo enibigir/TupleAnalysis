@@ -2,8 +2,8 @@
 """
 Generate HSCPSelector.h and HSCPSelector.C from the templates and a selection file.
 
-    python3 python/CreateSelector.py                                   # cfg/HSCPpreSelections.csv -> macros/
-    python3 python/CreateSelector.py --selections sel.csv --out-dir d  # one selector per Condor group
+    python3 python/CreateSelector.py                                   # cfg/selections.json -> macros/
+    python3 python/CreateSelector.py --selections sel.json --out-dir d  # one selector per Condor group
 
 launch.py and condor/submit.py do this themselves; this script is for a manual run.
 The code lives in python/hscp/selector.py.

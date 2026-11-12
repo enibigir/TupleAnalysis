@@ -27,7 +27,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta2p4(int i){
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) < 2.4) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.3) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 1) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) < 2.4) && (EoP[i] < 0.3) && (ptOverptErr[i] < 1);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta1(int i){
@@ -35,7 +35,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta1(int i){
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) < 1) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.3) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 1) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) < 1) && (EoP[i] < 0.3) && (ptOverptErr[i] < 1);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta1_2p4(int i){
@@ -43,7 +43,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_Eta1_2p4(int i){
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.3) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 1) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4) && (EoP[i] < 0.3) && (ptOverptErr[i] < 1);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta2p4(int i){
@@ -51,7 +51,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta2p4(int
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) < 2.4) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.1) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 1) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) < 2.4) && (EoP[i] < 0.1) && (ptOverptErr[i] < 1);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta1(int i){
@@ -59,7 +59,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta1(int i
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) < 1) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.1) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 1) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) < 1) && (EoP[i] < 0.1) && (ptOverptErr[i] < 1);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta1_2p4(int i){
@@ -67,7 +67,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_EoP_0p1_Eta1_2p4(i
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.1) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 1) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4) && (EoP[i] < 0.1) && (ptOverptErr[i] < 1);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta2p4(int i){
@@ -75,7 +75,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) < 2.4) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.3) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 0.5) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) < 2.4) && (EoP[i] < 0.3) && (ptOverptErr[i] < 0.5);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta1(int i){
@@ -83,7 +83,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) < 1) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.3) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 0.5) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) < 1) && (EoP[i] < 0.3) && (ptOverptErr[i] < 0.5);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta1_2p4(int i){
@@ -91,7 +91,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.3) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 0.5) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4) && (EoP[i] < 0.3) && (ptOverptErr[i] < 0.5);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta2p4(int i){
@@ -99,7 +99,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) < 2.4) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.1) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 0.5) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) < 2.4) && (EoP[i] < 0.1) && (ptOverptErr[i] < 0.5);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1(int i){
@@ -107,7 +107,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) < 1) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.1) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 0.5) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) < 1) && (EoP[i] < 0.1) && (ptOverptErr[i] < 0.5);
 }
 
 bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1_2p4(int i){
@@ -115,7 +115,7 @@ bool HSCPSelector::PassHSCPpresel_METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_
       cout << i << endl;
       return false;
    }
-   return (( (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (EoP[i] < 0.1) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (ptOverptErr[i] < 0.5) && (Ih_Strip[i] > C) ));
+   return (Flag_allMETFilters[0] == true) && (RecoPUppiMET[0] > 150.) && (Pt[i] > 50.0) && (Pt_pseudo[i] > 50.0) && (NbPixelHit_noL1[i] >= 2) && (FracOfValidHit[i] > 0.8) && (NOM_noL1[i] >= 10) && (isHighPurityTrack[i] == true) && (normChi2[i] < 5.0) && (std::abs(dz[i]) < 0.1) && (std::abs(dxy[i]) < 0.02) && (miniRelIsoAll[i] < 0.02) && (IsoSumPt_dr03[i] < 15) && (ptOverptErrptErr[i] < 0.0008) && (Fpix[i] > 0.3) && (Ih_Strip[i] > C) && (std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4) && (EoP[i] < 0.1) && (ptOverptErr[i] < 0.5);
 }
 
 

@@ -40,7 +40,7 @@ def parse_args(argv):
     ap.add_argument("--jobs", type=int, default=1, help="samples run at the same time (each with 1 thread)")
     ap.add_argument("--threads", type=int, help="implicit-MT threads per sample (default: 1 if --jobs > 1, else ROOT's 4)")
     ap.add_argument("--keep-going", action="store_true", help="continue with the next sample after a failure")
-    ap.add_argument("--selections", default=config.SELECTIONS_FILE, help="selection file (default: cfg/HSCPpreSelections.csv)")
+    ap.add_argument("--selections", default=config.SELECTIONS_FILE, help="selection file (default: cfg/selections.json)")
     ap.add_argument("--prod-dir", help="production directory (default: $HSCP_PROD_DIR, else prod_dir of datasets.json)")
     ap.add_argument("--keep-build", action="store_true", help="keep the compiled selector (HSCPSelector_C*) afterwards")
     args = ap.parse_args(argv)

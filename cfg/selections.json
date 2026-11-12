@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "Candidate selections of the analysis, read by python/hscp/selector.py (launch.sh, condor/submit.py, CreateSelector.py).",
+    "common:     cuts applied by every selection.",
+    "selections: label -> the cuts specific to that selection, added to the common ones. The label names the",
+    "            selection and prefixes its histograms; it must be a C++ identifier. A selection may also be an object",
+    "            {\"cuts\": [...], \"enabled\": false, \"comment\": \"...\"}; a disabled selection is skipped.",
+    "A cut is a C++ boolean expression over the TTreeReader members of macros/HSCPTemplate.h and the candidate",
+    "index i. The selection is the AND of its cuts, each wrapped in parentheses, common ones first."
+  ],
+  "common": [
+    "Flag_allMETFilters[0] == true",
+    "RecoPUppiMET[0] > 150.",
+    "Pt[i] > 50.0",
+    "Pt_pseudo[i] > 50.0",
+    "NbPixelHit_noL1[i] >= 2",
+    "FracOfValidHit[i] > 0.8",
+    "NOM_noL1[i] >= 10",
+    "isHighPurityTrack[i] == true",
+    "normChi2[i] < 5.0",
+    "std::abs(dz[i]) < 0.1",
+    "std::abs(dxy[i]) < 0.02",
+    "miniRelIsoAll[i] < 0.02",
+    "IsoSumPt_dr03[i] < 15",
+    "ptOverptErrptErr[i] < 0.0008",
+    "Fpix[i] > 0.3",
+    "Ih_Strip[i] > C"
+  ],
+  "selections": {
+    "METanalysis_TestPUppiMETCut_Eta2p4":                             ["std::abs(Eta[i]) < 2.4", "EoP[i] < 0.3", "ptOverptErr[i] < 1"],
+    "METanalysis_TestPUppiMETCut_Eta1":                               ["std::abs(Eta[i]) < 1", "EoP[i] < 0.3", "ptOverptErr[i] < 1"],
+    "METanalysis_TestPUppiMETCut_Eta1_2p4":                           ["std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4", "EoP[i] < 0.3", "ptOverptErr[i] < 1"],
+    "METanalysis_TestPUppiMETCut_EoP_0p1_Eta2p4":                     ["std::abs(Eta[i]) < 2.4", "EoP[i] < 0.1", "ptOverptErr[i] < 1"],
+    "METanalysis_TestPUppiMETCut_EoP_0p1_Eta1":                       ["std::abs(Eta[i]) < 1", "EoP[i] < 0.1", "ptOverptErr[i] < 1"],
+    "METanalysis_TestPUppiMETCut_EoP_0p1_Eta1_2p4":                   ["std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4", "EoP[i] < 0.1", "ptOverptErr[i] < 1"],
+    "METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta2p4":           ["std::abs(Eta[i]) < 2.4", "EoP[i] < 0.3", "ptOverptErr[i] < 0.5"],
+    "METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta1":             ["std::abs(Eta[i]) < 1", "EoP[i] < 0.3", "ptOverptErr[i] < 0.5"],
+    "METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_Eta1_2p4":         ["std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4", "EoP[i] < 0.3", "ptOverptErr[i] < 0.5"],
+    "METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta2p4":   ["std::abs(Eta[i]) < 2.4", "EoP[i] < 0.1", "ptOverptErr[i] < 0.5"],
+    "METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1":     ["std::abs(Eta[i]) < 1", "EoP[i] < 0.1", "ptOverptErr[i] < 0.5"],
+    "METanalysis_TestPUppiMETCut_SigmaPtoverPt_0p5_EoP_0p1_Eta1_2p4": ["std::abs(Eta[i]) >= 1 && std::abs(Eta[i]) < 2.4", "EoP[i] < 0.1", "ptOverptErr[i] < 0.5"]
+  }
+}
