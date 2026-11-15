@@ -23,6 +23,103 @@
 
 using namespace std;
 
+// Fpix thresholds of the regions A, B, C, D
+constexpr float kFpix3 = 0.3f, kFpix4 = 0.4f, kFpix5 = 0.5f, kFpix6 = 0.6f, kFpix7 = 0.7f, kFpix8 = 0.8f,
+                kFpix9 = 0.9f, kFpix99 = 0.99f, kFpix999 = 0.999f, kFpix10 = 1.0f;
+
+// One region of the background estimate in one Fpix slice. Regions A and B hold the candidates with
+// pT <= ptcut, C and D those with pT > ptcut; the slice <lo>fp<hi> holds fpixLo < Fpix <= fpixHi.
+struct RegionSlice {
+   const char* suffix;    // start of the histogram suffix, e.g. "_regionA_3fp4"; the selection label follows
+   bool belowPtCut;       // true for A and B, false for C and D
+   float fpixLo;
+   float fpixHi;
+};
+
+// The (region, Fpix slice) pairs, in the order of the output file. To add a slice, add a line here.
+const RegionSlice kRegionSlices[] = {
+   {"_regionA_3fp4",   true,  kFpix3,   kFpix4},
+   {"_regionA_3fp6",   true,  kFpix3,   kFpix6},
+   {"_regionA_3fp8",   true,  kFpix3,   kFpix8},
+   {"_regionA_3fp9",   true,  kFpix3,   kFpix9},
+   {"_regionA_4fp5",   true,  kFpix4,   kFpix5},
+   {"_regionA_5fp6",   true,  kFpix5,   kFpix6},
+   {"_regionA_6fp7",   true,  kFpix6,   kFpix7},
+   {"_regionA_6fp9",   true,  kFpix6,   kFpix9},
+   {"_regionA_7fp8",   true,  kFpix7,   kFpix8},
+   {"_regionA_8fp9",   true,  kFpix8,   kFpix9},
+   {"_regionA_9fp10",  true,  kFpix9,   kFpix10},
+   {"_regionA_99fp10", true,  kFpix99,  kFpix10},
+   {"_regionA_999fp10",true,  kFpix999, kFpix10},
+
+   {"_regionB_3fp4",   true,  kFpix3,   kFpix4},
+   {"_regionB_3fp6",   true,  kFpix3,   kFpix6},
+   {"_regionB_3fp8",   true,  kFpix3,   kFpix8},
+   {"_regionB_3fp9",   true,  kFpix3,   kFpix9},
+   {"_regionB_4fp5",   true,  kFpix4,   kFpix5},
+   {"_regionB_5fp6",   true,  kFpix5,   kFpix6},
+   {"_regionB_6fp7",   true,  kFpix6,   kFpix7},
+   {"_regionB_6fp9",   true,  kFpix6,   kFpix9},
+   {"_regionB_7fp8",   true,  kFpix7,   kFpix8},
+   {"_regionB_8fp9",   true,  kFpix8,   kFpix9},
+   {"_regionB_8fp10",  true,  kFpix8,   kFpix10},
+   {"_regionB_9fp10",  true,  kFpix9,   kFpix10},
+   {"_regionB_99fp10", true,  kFpix99,  kFpix10},
+   {"_regionB_999fp10",true,  kFpix999, kFpix10},
+
+   {"_regionC_3fp4",   false, kFpix3,   kFpix4},
+   {"_regionC_3fp6",   false, kFpix3,   kFpix6},
+   {"_regionC_3fp8",   false, kFpix3,   kFpix8},
+   {"_regionC_3fp9",   false, kFpix3,   kFpix9},
+   {"_regionC_4fp5",   false, kFpix4,   kFpix5},
+   {"_regionC_5fp6",   false, kFpix5,   kFpix6},
+   {"_regionC_6fp7",   false, kFpix6,   kFpix7},
+   {"_regionC_6fp9",   false, kFpix6,   kFpix9},
+   {"_regionC_7fp8",   false, kFpix7,   kFpix8},
+   {"_regionC_8fp9",   false, kFpix8,   kFpix9},
+
+   {"_regionD_3fp4",   false, kFpix3,   kFpix4},
+   {"_regionD_3fp8",   false, kFpix3,   kFpix8},
+   {"_regionD_4fp5",   false, kFpix4,   kFpix5},
+   {"_regionD_5fp6",   false, kFpix5,   kFpix6},
+   {"_regionD_6fp7",   false, kFpix6,   kFpix7},
+   {"_regionD_6fp9",   false, kFpix6,   kFpix9},
+   {"_regionD_7fp8",   false, kFpix7,   kFpix8},
+   {"_regionD_8fp9",   false, kFpix8,   kFpix9},
+   {"_regionD_8fp10",  false, kFpix8,   kFpix10},
+   {"_regionD_9fp10",  false, kFpix9,   kFpix10},
+   {"_regionD_99fp10", false, kFpix99,  kFpix10},
+   {"_regionD_999fp10",false, kFpix999, kFpix10},
+};
+const size_t kNRegionSlices = sizeof(kRegionSlices) / sizeof(kRegionSlices[0]);
+
+// Cuts on one candidate with a track, evaluated once per event at the top of Process and read by
+// every candidate loop. The thresholds are those of the "common" cuts of cfg/selections.json.
+struct TrackCuts {
+   bool ptCut = false;        // Pt_pseudo > 50 && Pt > 50
+   bool etaCut = false;       // |eta| < 2.4
+   bool nPix = false;         // NbPixelHit_noL1 >= 2
+   bool nom = false;          // NOM_noL1 >= 10
+   bool fovh = false;         // FracOfValidHit > 0.8
+   bool highPurity = false;
+   bool chi2Cut = false;      // normChi2 < 5
+   bool dzCut = false;        // |dz| < 0.1
+   bool dxyCut = false;       // |dxy| < 0.02
+   bool miniIso = false;      // miniRelIsoAll < 0.02
+   bool trkIso = false;       // IsoSumPt_dr03 < 15
+   bool eop = false;          // EoP < 0.3
+   bool ptErr2 = false;       // ptErr/pt^2 < 0.0008
+   bool ptErr = false;        // ptErr/pt < 1
+   bool fpixLow = false;      // Fpix > 0.3
+   bool fpixCalib = false;    // Fpix < 0.9, used by the trigger-efficiency calibration selections
+   bool ihAboveC = false;     // Ih > C of the sample
+   bool ihAboveDataC = false; // Ih > 2.9784, the data C, as hard-coded in the partial selections (differs from ihAboveC on MC)
+
+   bool quality()   const { return nPix && nom && fovh && highPurity && chi2Cut && dzCut && dxyCut; }
+   bool core()      const { return ptCut && etaCut && quality() && miniIso && trkIso && ptErr2; }   // calibration selections
+   bool fullDataC() const { return core() && eop && fpixLow && ptErr && ihAboveDataC; }           // partial HSCP selections
+};
+
 
 class HSCPSelector : public TSelector {
 public :
@@ -166,126 +263,10 @@ public :
    TTreeReaderArray<float> electron_pfMiniRelIsoAll = {fReader, "electron_pfMiniRelIsoAll"};
 
 
-   // BACKGROUND ESTIMATION METHOD: HISTOGRAMS   
-   float fpix3 = 0.3;
-   float fpix4 = 0.4;
-   float fpix5 = 0.5;
-   float fpix6 = 0.6;
-   float fpix7 = 0.7;
-   float fpix8 = 0.8;
-   float fpix9 = 0.9;
-   float fpix99 = 0.99;
-   float fpix999 = 0.999;
-   float fpix10 = 1.0;
-
-
-   std::string regFpixA_3f4 = "_regionA_3fp4";
-   std::string regFpixA_3f6 = "_regionA_3fp6";
-   std::string regFpixA_3f8 = "_regionA_3fp8";
-   std::string regFpixA_3f9 = "_regionA_3fp9";
-   std::string regFpixA_4f5 = "_regionA_4fp5";
-   std::string regFpixA_5f6 = "_regionA_5fp6";
-   std::string regFpixA_6f7 = "_regionA_6fp7";
-   std::string regFpixA_6f9 = "_regionA_6fp9";
-   std::string regFpixA_7f8 = "_regionA_7fp8";
-   std::string regFpixA_8f9 = "_regionA_8fp9";
-   std::string regFpixA_9f10 = "_regionA_9fp10";
-   std::string regFpixA_99f10 = "_regionA_99fp10";
-   std::string regFpixA_999f10 = "_regionA_999fp10";
-
-   std::string regFpixB_3f4 = "_regionB_3fp4";
-   std::string regFpixB_3f6 = "_regionB_3fp6";
-   std::string regFpixB_3f8 = "_regionB_3fp8";
-   std::string regFpixB_3f9 = "_regionB_3fp9";
-   std::string regFpixB_4f5 = "_regionB_4fp5";
-   std::string regFpixB_5f6 = "_regionB_5fp6";
-   std::string regFpixB_6f7 = "_regionB_6fp7";
-   std::string regFpixB_6f9 = "_regionB_6fp9";
-   std::string regFpixB_7f8 = "_regionB_7fp8";
-   std::string regFpixB_8f9 = "_regionB_8fp9";
-   std::string regFpixB_8f10 = "_regionB_8fp10";
-   std::string regFpixB_9f10 = "_regionB_9fp10";
-   std::string regFpixB_99f10 = "_regionB_99fp10";
-   std::string regFpixB_999f10 = "_regionB_999fp10";
-
-   std::string regFpixC_3f4 = "_regionC_3fp4";
-   std::string regFpixC_3f6 = "_regionC_3fp6";
-   std::string regFpixC_3f8 = "_regionC_3fp8";
-   std::string regFpixC_3f9 = "_regionC_3fp9";
-   std::string regFpixC_4f5 = "_regionC_4fp5";
-   std::string regFpixC_5f6 = "_regionC_5fp6";
-   std::string regFpixC_6f7 = "_regionC_6fp7";
-   std::string regFpixC_6f9 = "_regionC_6fp9";
-   std::string regFpixC_7f8 = "_regionC_7fp8";
-   std::string regFpixC_8f9 = "_regionC_8fp9";
-
-   std::string regFpixD_3f4 = "_regionD_3fp4";
-   std::string regFpixD_3f8 = "_regionD_3fp8";
-   std::string regFpixD_4f5 = "_regionD_4fp5";
-   std::string regFpixD_5f6 = "_regionD_5fp6";
-   std::string regFpixD_6f7 = "_regionD_6fp7";
-   std::string regFpixD_6f9 = "_regionD_6fp9";
-   std::string regFpixD_7f8 = "_regionD_7fp8";
-   std::string regFpixD_8f9 = "_regionD_8fp9";
-   std::string regFpixD_8f10 = "_regionD_8fp10";
-   std::string regFpixD_9f10 = "_regionD_9fp10";
-   std::string regFpixD_99f10 = "_regionD_99fp10";
-   std::string regFpixD_999f10 = "_regionD_999fp10";
-
-
-   std::vector<RegionMassPlot> vmrp_regionA_3f4;
-   std::vector<RegionMassPlot> vmrp_regionA_3f6;
-   std::vector<RegionMassPlot> vmrp_regionA_3f8;
-   std::vector<RegionMassPlot> vmrp_regionA_3f9;
-   std::vector<RegionMassPlot> vmrp_regionA_4f5;
-   std::vector<RegionMassPlot> vmrp_regionA_5f6;
-   std::vector<RegionMassPlot> vmrp_regionA_6f7;
-   std::vector<RegionMassPlot> vmrp_regionA_6f9;
-   std::vector<RegionMassPlot> vmrp_regionA_7f8;
-   std::vector<RegionMassPlot> vmrp_regionA_8f9;
-   std::vector<RegionMassPlot> vmrp_regionA_9f10;
-   std::vector<RegionMassPlot> vmrp_regionA_99f10;
-   std::vector<RegionMassPlot> vmrp_regionA_999f10;
-
-   std::vector<RegionMassPlot> vmrp_regionB_3f4;
-   std::vector<RegionMassPlot> vmrp_regionB_3f6;
-   std::vector<RegionMassPlot> vmrp_regionB_3f8;
-   std::vector<RegionMassPlot> vmrp_regionB_3f9;
-   std::vector<RegionMassPlot> vmrp_regionB_4f5;
-   std::vector<RegionMassPlot> vmrp_regionB_5f6;
-   std::vector<RegionMassPlot> vmrp_regionB_6f7;
-   std::vector<RegionMassPlot> vmrp_regionB_6f9;
-   std::vector<RegionMassPlot> vmrp_regionB_7f8;
-   std::vector<RegionMassPlot> vmrp_regionB_8f9;
-   std::vector<RegionMassPlot> vmrp_regionB_8f10;
-   std::vector<RegionMassPlot> vmrp_regionB_9f10;
-   std::vector<RegionMassPlot> vmrp_regionB_99f10;
-   std::vector<RegionMassPlot> vmrp_regionB_999f10;
-
-   std::vector<RegionMassPlot> vmrp_regionC_3f4;
-   std::vector<RegionMassPlot> vmrp_regionC_3f6;
-   std::vector<RegionMassPlot> vmrp_regionC_3f8;
-   std::vector<RegionMassPlot> vmrp_regionC_3f9;
-   std::vector<RegionMassPlot> vmrp_regionC_4f5;
-   std::vector<RegionMassPlot> vmrp_regionC_5f6;
-   std::vector<RegionMassPlot> vmrp_regionC_6f7;
-   std::vector<RegionMassPlot> vmrp_regionC_6f9;
-   std::vector<RegionMassPlot> vmrp_regionC_7f8;
-   std::vector<RegionMassPlot> vmrp_regionC_8f9;
-
-   std::vector<RegionMassPlot> vmrp_regionD_3f4;
-   std::vector<RegionMassPlot> vmrp_regionD_3f8;
-   std::vector<RegionMassPlot> vmrp_regionD_4f5;
-   std::vector<RegionMassPlot> vmrp_regionD_5f6;
-   std::vector<RegionMassPlot> vmrp_regionD_6f7;
-   std::vector<RegionMassPlot> vmrp_regionD_6f9;
-   std::vector<RegionMassPlot> vmrp_regionD_7f8;
-   std::vector<RegionMassPlot> vmrp_regionD_8f9;
-   std::vector<RegionMassPlot> vmrp_regionD_8f10;
-   std::vector<RegionMassPlot> vmrp_regionD_9f10;
-   std::vector<RegionMassPlot> vmrp_regionD_99f10;
-   std::vector<RegionMassPlot> vmrp_regionD_999f10;
-
+   // BACKGROUND ESTIMATION METHOD: HISTOGRAMS
+   // One vector of RegionMassPlot per entry of kRegionSlices, one element per selection:
+   // vmrp_[slice][selection]. The histograms are named <quantity><suffix>_<selection label>.
+   std::vector<std::vector<RegionMassPlot>> vmrp_;
    
    HSCPSelector()
    {

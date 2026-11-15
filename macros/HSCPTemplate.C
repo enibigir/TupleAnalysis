@@ -3,7 +3,7 @@
 #include "HSCPSelector.h"
 #include <TH2.h>
 #include <TH1.h>
-#include <functional>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <map>
@@ -100,177 +100,15 @@ void HSCPSelector::SlaveBegin(TTree *tree) {
     //-------------------------------------
     //create RegionMassPlot for all selection
     //-------------------------------------
+    vmrp_.assign(kNRegionSlices, std::vector<RegionMassPlot>());
     for(unsigned int i=0; i<selLabels_.size();i++)
     {
         cout << "Initialisation of the regions for selection: " << selLabels_[i] << endl;
 
-        //Create names for each plot in each regions (slices in Fpixels)
-        
-        std::string label_FpixA_3f4 = regFpixA_3f4 + "_" + selLabels_[i]; 
-        std::string label_FpixA_3f6 = regFpixA_3f6 + "_" + selLabels_[i]; 
-        std::string label_FpixA_3f8 = regFpixA_3f8 + "_" + selLabels_[i]; 
-        std::string label_FpixA_3f9 = regFpixA_3f9 + "_" + selLabels_[i]; 
-        std::string label_FpixA_4f5 = regFpixA_4f5 + "_" + selLabels_[i]; 
-        std::string label_FpixA_5f6 = regFpixA_5f6 + "_" + selLabels_[i]; 
-        std::string label_FpixA_6f7 = regFpixA_6f7 + "_" + selLabels_[i]; 
-        std::string label_FpixA_6f9 = regFpixA_6f9 + "_" + selLabels_[i];
-        std::string label_FpixA_7f8 = regFpixA_7f8 + "_" + selLabels_[i]; 
-        std::string label_FpixA_8f9 = regFpixA_8f9 + "_" + selLabels_[i]; 
-        std::string label_FpixA_9f10 = regFpixA_9f10 + "_" + selLabels_[i];
-        std::string label_FpixA_99f10 = regFpixA_99f10 + "_" + selLabels_[i];
-        std::string label_FpixA_999f10 = regFpixA_999f10 + "_" + selLabels_[i];
-
-        std::string label_FpixB_3f4 = regFpixB_3f4 + "_" + selLabels_[i]; 
-        std::string label_FpixB_3f6 = regFpixB_3f6 + "_" + selLabels_[i]; 
-        std::string label_FpixB_3f8 = regFpixB_3f8 + "_" + selLabels_[i]; 
-        std::string label_FpixB_3f9 = regFpixB_3f9 + "_" + selLabels_[i]; 
-        std::string label_FpixB_4f5 = regFpixB_4f5 + "_" + selLabels_[i]; 
-        std::string label_FpixB_5f6 = regFpixB_5f6 + "_" + selLabels_[i]; 
-        std::string label_FpixB_6f7 = regFpixB_6f7 + "_" + selLabels_[i]; 
-        std::string label_FpixB_6f9 = regFpixB_6f9 + "_" + selLabels_[i]; 
-        std::string label_FpixB_7f8 = regFpixB_7f8 + "_" + selLabels_[i]; 
-        std::string label_FpixB_8f9 = regFpixB_8f9 + "_" + selLabels_[i]; 
-        std::string label_FpixB_8f10 = regFpixB_8f10 + "_" + selLabels_[i];
-        std::string label_FpixB_9f10 = regFpixB_9f10 + "_" + selLabels_[i];
-        std::string label_FpixB_99f10 = regFpixB_99f10 + "_" + selLabels_[i];
-        std::string label_FpixB_999f10 = regFpixB_999f10 + "_" + selLabels_[i];
-
-        std::string label_FpixC_3f4 = regFpixC_3f4 + "_" + selLabels_[i]; 
-        std::string label_FpixC_3f6 = regFpixC_3f6 + "_" + selLabels_[i]; 
-        std::string label_FpixC_3f8 = regFpixC_3f8 + "_" + selLabels_[i]; 
-        std::string label_FpixC_3f9 = regFpixC_3f9 + "_" + selLabels_[i]; 
-        std::string label_FpixC_4f5 = regFpixC_4f5 + "_" + selLabels_[i]; 
-        std::string label_FpixC_5f6 = regFpixC_5f6 + "_" + selLabels_[i]; 
-        std::string label_FpixC_6f7 = regFpixC_6f7 + "_" + selLabels_[i]; 
-        std::string label_FpixC_6f9 = regFpixC_6f9 + "_" + selLabels_[i]; 
-        std::string label_FpixC_7f8 = regFpixC_7f8 + "_" + selLabels_[i]; 
-        std::string label_FpixC_8f9 = regFpixC_8f9 + "_" + selLabels_[i]; 
-
-        std::string label_FpixD_3f4 = regFpixD_3f4 + "_" + selLabels_[i];
-        std::string label_FpixD_3f8 = regFpixD_3f8 + "_" + selLabels_[i];
-        std::string label_FpixD_4f5 = regFpixD_4f5 + "_" + selLabels_[i]; 
-        std::string label_FpixD_5f6 = regFpixD_5f6 + "_" + selLabels_[i]; 
-        std::string label_FpixD_6f7 = regFpixD_6f7 + "_" + selLabels_[i]; 
-        std::string label_FpixD_6f9 = regFpixD_6f9 + "_" + selLabels_[i];
-        std::string label_FpixD_7f8 = regFpixD_7f8 + "_" + selLabels_[i]; 
-        std::string label_FpixD_8f9 = regFpixD_8f9 + "_" + selLabels_[i]; 
-        std::string label_FpixD_8f10 = regFpixD_8f10 + "_" + selLabels_[i];
-        std::string label_FpixD_9f10 = regFpixD_9f10 + "_" + selLabels_[i]; 
-        std::string label_FpixD_99f10 = regFpixD_99f10 + "_" + selLabels_[i]; 
-        std::string label_FpixD_999f10 = regFpixD_999f10 + "_" + selLabels_[i]; 
-
-
-        //Create objects RegionMassPlot using the names defined above
-
-        RegionMassPlot regA_3f4(label_FpixA_3f4.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
-        RegionMassPlot regA_3f6(label_FpixA_3f6.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regA_3f8(label_FpixA_3f8.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regA_3f9(label_FpixA_3f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regA_4f5(label_FpixA_4f5.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regA_5f6(label_FpixA_5f6.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regA_6f7(label_FpixA_6f7.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
-        RegionMassPlot regA_6f9(label_FpixA_6f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
-        RegionMassPlot regA_7f8(label_FpixA_7f8.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
-        RegionMassPlot regA_8f9(label_FpixA_8f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regA_9f10(label_FpixA_9f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regA_99f10(label_FpixA_99f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regA_999f10(label_FpixA_999f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-
-        RegionMassPlot regB_3f4(label_FpixB_3f4.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_3f6(label_FpixB_3f6.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_3f8(label_FpixB_3f8.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_3f9(label_FpixB_3f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_4f5(label_FpixB_4f5.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_5f6(label_FpixB_5f6.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_6f7(label_FpixB_6f7.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_6f9(label_FpixB_6f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_7f8(label_FpixB_7f8.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);     
-        RegionMassPlot regB_8f9(label_FpixB_8f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_8f10(label_FpixB_8f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_9f10(label_FpixB_9f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_99f10(label_FpixB_99f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regB_999f10(label_FpixB_999f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
-
-        RegionMassPlot regC_3f4(label_FpixC_3f4.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_3f6(label_FpixC_3f6.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_3f8(label_FpixC_3f8.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_3f9(label_FpixC_3f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_4f5(label_FpixC_4f5.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_5f6(label_FpixC_5f6.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_6f7(label_FpixC_6f7.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_6f9(label_FpixC_6f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_7f8(label_FpixC_7f8.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regC_8f9(label_FpixC_8f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-
-        RegionMassPlot regD_3f4(label_FpixD_3f4.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_3f8(label_FpixD_3f8.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_4f5(label_FpixD_4f5.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_5f6(label_FpixD_5f6.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_6f7(label_FpixD_6f7.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_6f9(label_FpixD_6f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_7f8(label_FpixD_7f8.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);     
-        RegionMassPlot regD_8f9(label_FpixD_8f9.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_8f10(label_FpixD_8f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_9f10(label_FpixD_9f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_99f10(label_FpixD_99f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-        RegionMassPlot regD_999f10(label_FpixD_999f10.c_str(), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C); 
-    
-
-        //push the RegionMassPlot objects created in vectors, because you have a set of different plot for each region, for each selection (defined in the configuration file) 
-        
-        vmrp_regionA_3f4.push_back(std::move(regA_3f4));
-        vmrp_regionA_3f6.push_back(std::move(regA_3f6));
-        vmrp_regionA_3f8.push_back(std::move(regA_3f8));
-        vmrp_regionA_3f9.push_back(std::move(regA_3f9));
-        vmrp_regionA_4f5.push_back(std::move(regA_4f5));
-        vmrp_regionA_5f6.push_back(std::move(regA_5f6));
-        vmrp_regionA_6f7.push_back(std::move(regA_6f7));
-        vmrp_regionA_6f9.push_back(std::move(regA_6f9));
-        vmrp_regionA_7f8.push_back(std::move(regA_7f8));
-        vmrp_regionA_8f9.push_back(std::move(regA_8f9));
-        vmrp_regionA_9f10.push_back(std::move(regA_9f10));
-        vmrp_regionA_99f10.push_back(std::move(regA_99f10));
-        vmrp_regionA_999f10.push_back(std::move(regA_999f10));
-
-        vmrp_regionB_3f4.push_back(std::move(regB_3f4));
-        vmrp_regionB_3f6.push_back(std::move(regB_3f6));
-        vmrp_regionB_3f8.push_back(std::move(regB_3f8));
-        vmrp_regionB_3f9.push_back(std::move(regB_3f9));
-        vmrp_regionB_4f5.push_back(std::move(regB_4f5));
-        vmrp_regionB_5f6.push_back(std::move(regB_5f6));
-        vmrp_regionB_6f7.push_back(std::move(regB_6f7));
-        vmrp_regionB_6f9.push_back(std::move(regB_6f9));
-        vmrp_regionB_7f8.push_back(std::move(regB_7f8));
-        vmrp_regionB_8f9.push_back(std::move(regB_8f9));
-        vmrp_regionB_8f10.push_back(std::move(regB_8f10));
-        vmrp_regionB_9f10.push_back(std::move(regB_9f10));
-        vmrp_regionB_99f10.push_back(std::move(regB_99f10));
-        vmrp_regionB_999f10.push_back(std::move(regB_999f10));
-
-        vmrp_regionC_3f4.push_back(std::move(regC_3f4));
-        vmrp_regionC_3f6.push_back(std::move(regC_3f6));
-        vmrp_regionC_3f8.push_back(std::move(regC_3f8));
-        vmrp_regionC_3f9.push_back(std::move(regC_3f9));    
-        vmrp_regionC_4f5.push_back(std::move(regC_4f5));
-        vmrp_regionC_5f6.push_back(std::move(regC_5f6));
-        vmrp_regionC_6f7.push_back(std::move(regC_6f7));
-        vmrp_regionC_6f9.push_back(std::move(regC_6f9));
-        vmrp_regionC_7f8.push_back(std::move(regC_7f8));
-        vmrp_regionC_8f9.push_back(std::move(regC_8f9));
-
-        vmrp_regionD_3f4.push_back(std::move(regD_3f4));
-        vmrp_regionD_3f8.push_back(std::move(regD_3f8));
-        vmrp_regionD_4f5.push_back(std::move(regD_4f5));
-        vmrp_regionD_5f6.push_back(std::move(regD_5f6));
-        vmrp_regionD_6f7.push_back(std::move(regD_6f7));
-        vmrp_regionD_6f9.push_back(std::move(regD_6f9));
-        vmrp_regionD_7f8.push_back(std::move(regD_7f8));
-        vmrp_regionD_8f9.push_back(std::move(regD_8f9));
-        vmrp_regionD_8f10.push_back(std::move(regD_8f10));
-        vmrp_regionD_9f10.push_back(std::move(regD_9f10));
-        vmrp_regionD_99f10.push_back(std::move(regD_99f10));
-        vmrp_regionD_999f10.push_back(std::move(regD_999f10));
-
+        // one RegionMassPlot per (region, Fpix slice) of kRegionSlices, for this selection
+        for (size_t r = 0; r < kNRegionSlices; ++r)
+            vmrp_[r].emplace_back(std::string(kRegionSlices[r].suffix) + "_" + selLabels_[i],
+                                  etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
 
         CPlots plots;
 
@@ -912,10 +750,43 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
     }
 
 
-    unsigned int i = 0;
-    for (unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){
+    //----------------------------------
+    // Candidates with a track. The IsoTrack arrays hold one entry per candidate with HSCP_hasTrack,
+    // in order, so the track index is the rank among those candidates. The cuts shared by the
+    // candidate loops below are evaluated once per track here.
+    //----------------------------------
+    int nTracks = 0;
+    for (unsigned int j = 0; j < HSCP_hasTrack.GetSize(); j++) if (HSCP_hasTrack[j]) nTracks++;
+    if (nTracks > (int)Pt.GetSize())
+        throw std::runtime_error("HSCPSelector: " + std::to_string(nTracks) + " candidates with a track but only "
+                                 + std::to_string(Pt.GetSize()) + " IsoTrack entries in entry " + std::to_string(entry));
+    std::vector<TrackCuts> tcuts(nTracks);
+    for (int i = 0; i < nTracks; ++i) {
+        TrackCuts& t = tcuts[i];
+        t.ptCut        = (Pt_pseudo[i] > 50.) && (Pt[i] > 50.);
+        t.etaCut       = std::abs(Eta[i]) < 2.4;
+        t.nPix         = NbPixelHit_noL1[i] >= 2;
+        t.nom          = NOM_noL1[i] >= 10;
+        t.fovh         = FracOfValidHit[i] > 0.8;
+        t.highPurity   = isHighPurityTrack[i];
+        t.chi2Cut      = normChi2[i] < 5.0;
+        t.dzCut        = std::abs(dz[i]) < 0.1;
+        t.dxyCut       = std::abs(dxy[i]) < 0.02;
+        t.miniIso      = miniRelIsoAll[i] < 0.02;
+        t.trkIso       = IsoSumPt_dr03[i] < 15;
+        t.eop          = EoP[i] < 0.3;
+        t.ptErr2       = ptOverptErrptErr[i] < 0.0008;
+        t.ptErr        = ptOverptErr[i] < 1;
+        t.fpixLow      = Fpix[i] > 0.3;
+        t.fpixCalib    = Fpix[i] < 0.9;
+        t.ihAboveC     = Ih_Strip[i] > C;
+        t.ihAboveDataC = Ih_Strip[i] > 2.9784;
+    }
+    const bool anyMETtrigger = *HLT_PFMET120_PFMHT120_IDTight || *HLT_PFHT500_PFMET100_PFMHT100_IDTight
+                            || *HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 || *HLT_MET105_IsoTrk50;
 
-        if (!HSCP_hasTrack[j]) continue;
+    for (int i = 0; i < nTracks; ++i) {
+        const TrackCuts& t = tcuts[i];
 
             //TAKE MOST IONIZING CANDIDATE
         for(unsigned int s=0;s<selections_.size();s++){
@@ -930,23 +801,12 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
         }
 
 
-        // CUTFLOW
-        singleCut[3] = singleCut[2] && (Pt_pseudo[i] > 50.) && (Pt[i] > 50.);
-        singleCut[4] = singleCut[3] && fabs(Eta[i]) < 2.4;
-        singleCut[5] = singleCut[4] && (NbPixelHit_noL1[i] >= 2);
-        singleCut[6] = singleCut[5] && (NOM_noL1[i] >= 10);
-        singleCut[7] = singleCut[6] && (FracOfValidHit[i] > 0.8);
-        singleCut[8] = singleCut[7] && isHighPurityTrack[i];
-        singleCut[9] = singleCut[8] && (normChi2[i] < 5);
-        singleCut[10] = singleCut[9] && (fabs(dz[i]) < 0.1);
-        singleCut[11] = singleCut[10] && (fabs(dxy[i]) < 0.02);
-        singleCut[12] = singleCut[11] && (miniRelIsoAll[i] < 0.02);
-        singleCut[13] = singleCut[12] && (IsoSumPt_dr03[i] < 15);
-        singleCut[14] = singleCut[13] && (EoP[i] < 0.3);
-        singleCut[15] = singleCut[14] && (ptOverptErrptErr[i] < 0.0008);
-        singleCut[16] = singleCut[15] && (ptOverptErr[i] < 1);
-        singleCut[17] = singleCut[16] && (Fpix[i] > 0.3);
-        singleCut[18] = singleCut[17] && (Ih_Strip[i] > C);
+        // CUTFLOW: the 19 cuts in order, the three event-level ones first; singleCut[k] = all cuts up to k passed
+        const std::array<bool, 19> pass = {
+            trigger, METfilters, RecoPUppiMET[0] > 150.,
+            t.ptCut, t.etaCut, t.nPix, t.nom, t.fovh, t.highPurity, t.chi2Cut, t.dzCut, t.dxyCut,
+            t.miniIso, t.trkIso, t.eop, t.ptErr2, t.ptErr, t.fpixLow, t.ihAboveC};
+        for (unsigned int j = 3; j < pass.size(); ++j) singleCut[j] = singleCut[j-1] && pass[j];
 
             // candidate CUTFLOW
         vcp_nosel[0].FillHisto1D("CandidateCutflow", 0, *weightPU); // All candidates with a track
@@ -957,60 +817,25 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
         }
 
 
-        std::vector<std::function<bool(int)>> cuts;
-        cuts.push_back([&](int i){ return trigger; });
-        cuts.push_back([&](int i){ return METfilters; });
-        cuts.push_back([&](int i){ return RecoPUppiMET[0] > 150.; });
-        cuts.push_back([&](int i){ return ((Pt_pseudo[i] > 50.0) && (Pt[i] > 50.0)); });
-        cuts.push_back([&](int i){ return fabs(Eta[i]) < 2.4; });
-        cuts.push_back([&](int i){ return NbPixelHit_noL1[i] >= 2; });
-        cuts.push_back([&](int i){ return NOM_noL1[i] >= 10; });
-        cuts.push_back([&](int i){ return FracOfValidHit[i] > 0.8; });
-        cuts.push_back([&](int i){ return isHighPurityTrack[i]; });
-        cuts.push_back([&](int i){ return normChi2[i] < 5.0; });
-        cuts.push_back([&](int i){ return fabs(dz[i]) < 0.1; });
-        cuts.push_back([&](int i){ return fabs(dxy[i]) < 0.02; });
-        cuts.push_back([&](int i){ return miniRelIsoAll[i] < 0.02; });
-        cuts.push_back([&](int i){ return IsoSumPt_dr03[i] < 15; });
-        cuts.push_back([&](int i){ return EoP[i] < 0.3; });
-        cuts.push_back([&](int i){ return ptOverptErrptErr[i] < 0.0008; });
-        cuts.push_back([&](int i){ return ptOverptErr[i] < 1; });
-        cuts.push_back([&](int i){ return Fpix[i] > 0.3; });
-        cuts.push_back([&](int i){ return Ih_Strip[i] > C; });
-        
+            // Event CUTFLOW: the event passes cut j if one of its candidates passes cuts 0 to j
+        for (unsigned int j = 0; j < pass.size(); ++j) if (singleCut[j]) eventCuts[j] = true;
 
-            // Event CUTFLOW setup
-        bool allPassed = true;
-        for (unsigned int j = 0; j < cuts.size(); ++j) {
-            if (allPassed && cuts[j](i)) eventCuts[j] = true;
-            else allPassed = false;
-        }
-
-            // Event CUTFLOW without track cuts
-        std::vector<std::function<bool(int)>> cuts_NotrackCut = cuts;
-        cuts_NotrackCut[3] = [&](int i){ return true; }; // Pt
-        cuts_NotrackCut[12] = [&](int i){ return true; }; // miniRelIsoAll
-        cuts_NotrackCut[13] = [&](int i){ return true; }; // IsoSumPt_dr03
-        cuts_NotrackCut[14] = [&](int i){ return true; }; // EoP
-        cuts_NotrackCut[15] = [&](int i){ return true; }; // ptOverptErrptErr
-        cuts_NotrackCut[17] = [&](int i){ return true; }; // ptOverptErr
-
+            // Event CUTFLOW without track cuts: cuts 3 (Pt), 12 (miniRelIsoAll), 13 (IsoSumPt_dr03), 14 (EoP),
+            // 15 (ptOverptErrptErr) and 17 (Fpix) count as passed
         bool allPassed_NotrackCut = true;
-        for (unsigned int j = 0; j < cuts.size(); ++j) {
-            if (allPassed_NotrackCut && cuts_NotrackCut[j](i)) eventCuts_noTrackCut[j] = true;
+        for (unsigned int j = 0; j < pass.size(); ++j) {
+            const bool skipped = (j == 3 || j == 12 || j == 13 || j == 14 || j == 15 || j == 17);
+            if (allPassed_NotrackCut && (skipped || pass[j])) eventCuts_noTrackCut[j] = true;
             else allPassed_NotrackCut = false;
         }
 
-            // N-1 distributions
-        std::vector <bool> passedCuts(cuts.size(), true);
-        for (unsigned int icut = 0; icut < cuts.size(); ++icut) {
-            bool passedAllButOne = true;
-            for (unsigned int jcut = 0; jcut < cuts.size(); ++jcut) {
-                if (jcut == icut) continue;
-                if (!cuts[jcut](i)) { passedAllButOne = false; break; }
-            }
-            passedCuts[icut] = passedAllButOne; // N-1 candidat
-            if (passedAllButOne) {              // N-1 event
+            // N-1: cut icut is N-1 passed when every other cut is passed, i.e. at most icut fails
+        unsigned int nFailed = 0, firstFailed = 0;
+        for (unsigned int j = 0; j < pass.size(); ++j) if (!pass[j]) { if (nFailed == 0) firstFailed = j; ++nFailed; }
+        std::vector<bool> passedCuts(pass.size(), false);
+        for (unsigned int icut = 0; icut < pass.size(); ++icut) {
+            passedCuts[icut] = (nFailed == 0) || (nFailed == 1 && firstFailed == icut);   // N-1 candidat
+            if (passedCuts[icut]) {              // N-1 event
                 eventPassedNm1[icut] = true;
                 if (Ih_Strip[i] > maxIhNm1[icut]) {
                     maxIhNm1[icut] = Ih_Strip[i];
@@ -1060,8 +885,6 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
             vcp_nosel[0].FillHisto1F("LastBinEventCutflow___HSCP_type", HSCP_type[i], AppliedWeight1Dpuppi);    // No matching on the track + no PDG id check ! Careful please
             vcp_nosel[0].FillHisto1F("LastBinEventCutflow___PF_type", PF_type[i], AppliedWeight1Dpuppi);
         }
-
-        i++;
     } //End of loop over all HSCP candidates
 
     // Event CUTFLOW
@@ -1122,17 +945,7 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
                 if (electron_isTight[ie]==1 && electron_pt[ie]>20 && electron_pfMiniRelIsoAll[ie]<0.15) hasPassedElectron++;
             }
 
-            unsigned int i_track = 0;
-            for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    
-
-                if (!HSCP_hasTrack[j]) continue;
-
-                if ( (Pt[i_track] > 50.0) && (Pt_pseudo[i_track] > 50.0) && (std::abs(Eta[i_track]) < 2.4) && (NbPixelHit_noL1[i_track] >= 2) && (FracOfValidHit[i_track] > 0.8) && 
-                (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.1) && (std::abs(dxy[i_track]) < 0.02) && 
-                (miniRelIsoAll[i_track] < 0.02) && (IsoSumPt_dr03[i_track] < 15) && (ptOverptErrptErr[i_track] < 0.0008) ) hadPassedHSCP++;
-
-                i_track++;
-            }
+            for (int i = 0; i < nTracks; ++i) if (tcuts[i].core()) hadPassedHSCP++;
             
             if (BasicSel && hasPassedMuon==1 && hasPassedElectron==1 && hadPassedHSCP>0) {
 
@@ -1221,19 +1034,9 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
                 if (muon_isTight[im] && muon_pt[im]>30 && muon_pfMiniRelIsoAll[im]<0.15) hasPassedMuon++;
             }
 
-            unsigned int i_track = 0;
             std::vector <unsigned int> i_candPartialHSCP;
-            for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    
-
-                if (!HSCP_hasTrack[j]) continue;
-
-                if ( (Pt[i_track] > 50.0) && (Pt_pseudo[i_track] > 50.0) && (std::abs(Eta[i_track]) < 2.4) && (NbPixelHit_noL1[i_track] >= 2) && (FracOfValidHit[i_track] > 0.8) && 
-                (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.1) && (std::abs(dxy[i_track]) < 0.02) && 
-                (miniRelIsoAll[i_track] < 0.02) && (EoP[i_track] < 0.3) && (IsoSumPt_dr03[i_track] < 15) && (ptOverptErrptErr[i_track] < 0.0008) && 
-                (Fpix[i_track] < 0.9)) { hadPassedHSCP++; i_candPartialHSCP.push_back(i_track); };
-
-                i_track++;
-            }
+            for (int i = 0; i < nTracks; ++i)
+                if (tcuts[i].core() && tcuts[i].eop && tcuts[i].fpixCalib) { hadPassedHSCP++; i_candPartialHSCP.push_back(i); }
             
             if (BasicSel && hasPassedMuon==1 && hadPassedHSCP>0) {
 
@@ -1355,19 +1158,9 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
         if (selLabels_[s] == "TriggerEffCalib__Signal" || selLabels_[s] == "TriggerEffCalib_PseudoMETrescaled__Signal") {
             unsigned int hadPassedHSCP = 0;
 
-            unsigned int i_track = 0;
             std::vector <unsigned int> i_candPartialHSCP;
-            for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    
-
-                if (!HSCP_hasTrack[j]) continue;
-
-                if ( (Flag_allMETFilters[0] == true) && (Pt[i_track] > 50.0) && (Pt_pseudo[i_track] > 50.0) && (std::abs(Eta[i_track]) < 2.4) && (NbPixelHit_noL1[i_track] >= 2) && 
-                (FracOfValidHit[i_track] > 0.8) && (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.1) &&
-                (std::abs(dxy[i_track]) < 0.02) && (miniRelIsoAll[i_track] < 0.02) && (EoP[i_track] < 0.3) && (IsoSumPt_dr03[i_track] < 15) && (ptOverptErrptErr[i_track] < 0.0008) && 
-                (Fpix[i_track] > 0.3) && (ptOverptErr[i_track] < 1) && (Ih_Strip[i_track] > 2.9784)) { hadPassedHSCP++; i_candPartialHSCP.push_back(i_track); };
-
-                i_track++;
-            }
+            for (int i = 0; i < nTracks; ++i)
+                if ((Flag_allMETFilters[0] == true) && tcuts[i].fullDataC()) { hadPassedHSCP++; i_candPartialHSCP.push_back(i); }
             
             if (hadPassedHSCP>0) {
 
@@ -1496,18 +1289,8 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
                 if (muon_isTight[im] && muon_pt[im]>30 && muon_pfMiniRelIsoAll[im]<0.15) hasPassedMuon++;
             }
 
-            unsigned int i_track = 0;
-            for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    
-
-                if (!HSCP_hasTrack[j]) continue;
-
-                if ( (Pt[i_track] > 50.0) && (Pt_pseudo[i_track] > 50.0) && (std::abs(Eta[i_track]) < 2.4) && (NbPixelHit_noL1[i_track] >= 2) && (FracOfValidHit[i_track] > 0.8) && 
-                (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.1) && (std::abs(dxy[i_track]) < 0.02) && 
-                (miniRelIsoAll[i_track] < 0.02) && (EoP[i_track] < 0.3) && (IsoSumPt_dr03[i_track] < 15) && (ptOverptErrptErr[i_track] < 0.0008) && 
-                (Fpix[i_track] < 0.9)) hadPassedHSCP++;
-
-                i_track++;
-            }
+            for (int i = 0; i < nTracks; ++i)
+                if (tcuts[i].core() && tcuts[i].eop && tcuts[i].fpixCalib) hadPassedHSCP++;
             
             if (BasicSel && hasPassedMuon==1 && hadPassedHSCP>0) {
 
@@ -1574,98 +1357,92 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
     }
 
 
-    // HSCP loop 
-    int i_track = 0;
-    for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    // Every candidate
-
-        if (!HSCP_hasTrack[j]) continue;
+    // HSCP loop
+    for (int i = 0; i < nTracks; ++i) {
 
 
-        vcp_nosel[0].FillHisto1F("ndEdx_StripOnly", NOM_noL1[i_track] - NbPixelHit_noL1[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_Ptpseudo", Pt_pseudo[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_10000oP", 10000./(Pt_pseudo[i_track]*cosh(Eta[i_track])), *weightPU);
-        vcp_nosel[0].FillHisto2F("Nosel_10000oP_vs_Eta", 10000./(Pt_pseudo[i_track]*cosh(Eta[i_track])), Eta[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_eta", Eta[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_phi", Phi[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_PFMiniIso", miniRelIsoAll[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_TrkIso", IsoSumPt_dr03[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_EoverP", EoP[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_PtErr_over_PtPt", ptOverptErrptErr[i_track], *weightPU); 
+        vcp_nosel[0].FillHisto1F("ndEdx_StripOnly", NOM_noL1[i] - NbPixelHit_noL1[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_Ptpseudo", Pt_pseudo[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_P", Pt_pseudo[i]*cosh(Eta[i]), *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_10000oP", 10000./(Pt_pseudo[i]*cosh(Eta[i])), *weightPU);
+        vcp_nosel[0].FillHisto2F("Nosel_10000oP_vs_Eta", 10000./(Pt_pseudo[i]*cosh(Eta[i])), Eta[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_eta", Eta[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_phi", Phi[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_PFMiniIso", miniRelIsoAll[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_TrkIso", IsoSumPt_dr03[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_EoverP", EoP[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_PtErr_over_PtPt", ptOverptErrptErr[i], *weightPU); 
         if (isMC || isSignal) {
-            vcp_nosel[0].FillHisto1F("Nosel_Fpix", Fpix[i_track], *weightPU);
-            vcp_nosel[0].FillHisto1F("Nosel_Ih", Ih_Strip[i_track], *weightPU);
-            vcp_nosel[0].FillHisto1F("Nosel_Ih_rescaled", Ih_Strip[i_track]*3.2168/3.12692, *weightPU);
-            vcp_nosel[0].FillHisto1F("Nosel_Ih_oldCorr", Ih_Strip_oldCorr[i_track], *weightPU);
-            vcp_nosel[0].FillHisto1F("Nosel_Ih_noSF", Ih_Strip_noSF[i_track], *weightPU);
-            vcp_nosel[0].FillHisto2F("Nosel_10000oP_vs_Ih", 10000./(Pt_pseudo[i_track]*cosh(Eta[i_track])), Ih_Strip[i_track], *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Fpix", Fpix[i], *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Ih", Ih_Strip[i], *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Ih_rescaled", Ih_Strip[i]*3.2168/3.12692, *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Ih_oldCorr", Ih_Strip_oldCorr[i], *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Ih_noSF", Ih_Strip_noSF[i], *weightPU);
+            vcp_nosel[0].FillHisto2F("Nosel_10000oP_vs_Ih", 10000./(Pt_pseudo[i]*cosh(Eta[i])), Ih_Strip[i], *weightPU);
         }
-        if (!isSignal && !isMC && Fpix[i_track] <= 0.9) { //blind for data in the signal region
-            vcp_nosel[0].FillHisto1F("Nosel_Fpix", Fpix[i_track], *weightPU);
-            vcp_nosel[0].FillHisto1F("Nosel_Ih", Ih_Strip[i_track], *weightPU);
-            vcp_nosel[0].FillHisto1F("Nosel_Ih_rescaled", Ih_Strip[i_track]*3.2168/3.12692, *weightPU);
-            vcp_nosel[0].FillHisto1F("Nosel_Ih_oldCorr", Ih_Strip_oldCorr[i_track], *weightPU);
-            vcp_nosel[0].FillHisto1F("Nosel_Ih_noSF", Ih_Strip_noSF[i_track], *weightPU);
-            vcp_nosel[0].FillHisto2F("Nosel_10000oP_vs_Ih", 10000./(Pt_pseudo[i_track]*cosh(Eta[i_track])), Ih_Strip[i_track], *weightPU);
+        if (!isSignal && !isMC && Fpix[i] <= 0.9) { //blind for data in the signal region
+            vcp_nosel[0].FillHisto1F("Nosel_Fpix", Fpix[i], *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Ih", Ih_Strip[i], *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Ih_rescaled", Ih_Strip[i]*3.2168/3.12692, *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Ih_oldCorr", Ih_Strip_oldCorr[i], *weightPU);
+            vcp_nosel[0].FillHisto1F("Nosel_Ih_noSF", Ih_Strip_noSF[i], *weightPU);
+            vcp_nosel[0].FillHisto2F("Nosel_10000oP_vs_Ih", 10000./(Pt_pseudo[i]*cosh(Eta[i])), Ih_Strip[i], *weightPU);
         }
-        vcp_nosel[0].FillHisto1F("Nosel_PtErr_over_Pt", ptOverptErr[i_track], *weightPU);
-        vcp_nosel[0].FillHisto1F("Nosel_PthatQCD", PthatQCD[i_track], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_PtErr_over_Pt", ptOverptErr[i], *weightPU);
+        vcp_nosel[0].FillHisto1F("Nosel_PthatQCD", PthatQCD[i], *weightPU);
 
-        vcp_nosel[0].FillHisto2F("Nosel_Fpix_vs_RunNumber", *Run, Fpix[i_track], *weightPU);
-        vcp_nosel[0].FillHisto2F("Nosel_Ih_vs_RunNumber", *Run, Ih_Strip[i_track], *weightPU);
-        vcp_nosel[0].FillHisto2F("Nosel_Ih_oldCorr_vs_RunNumber", *Run, Ih_Strip_oldCorr[i_track], *weightPU);
+        vcp_nosel[0].FillHisto2F("Nosel_Fpix_vs_RunNumber", *Run, Fpix[i], *weightPU);
+        vcp_nosel[0].FillHisto2F("Nosel_Ih_vs_RunNumber", *Run, Ih_Strip[i], *weightPU);
+        vcp_nosel[0].FillHisto2F("Nosel_Ih_oldCorr_vs_RunNumber", *Run, Ih_Strip_oldCorr[i], *weightPU);
         vcp_nosel[0].FillHisto2F("Nosel_NPV_vs_RunNumber", *Run, *PV_npvsGood, *weightPU);
 
-        vcp_nosel[0].FillHisto2F("Nosel_Fpix_vs_IhnearC", Ih_Strip[i_track], Fpix[i_track], *weightPU);
+        vcp_nosel[0].FillHisto2F("Nosel_Fpix_vs_IhnearC", Ih_Strip[i], Fpix[i], *weightPU);
 
-        if (PseudoCaloMET[0] > 0 && RecoPUppiMET[0] > 0) vcp_nosel[0].FillHisto1F("Noselbis_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), *weightPU);
-
-
-        if (PF_type[i_track]==13) vcp_nosel[0].FillHisto2F("trackPT_vs_trackPseudoTrackPT__PFmuon", Pt[i_track], Pt_pseudo[i_track], *weightPU);
-        if (PF_type[i_track]==211) vcp_nosel[0].FillHisto2F("trackPT_vs_trackPseudoTrackPT__PFpion", Pt[i_track], Pt_pseudo[i_track], *weightPU);
-        vcp_nosel[0].FillHisto2F("trackPT_vs_trackPseudoTrackPT", Pt[i_track], Pt_pseudo[i_track], *weightPU);
-        vcp_nosel[0].FillHisto2F("trackETA_vs_trackPseudoTrackETA", Eta[i_track], Eta_pseudo[i_track], *weightPU);
-        vcp_nosel[0].FillHisto2F("trackPHI_vs_trackPseudoTrackPHI", Phi[i_track], Phi_pseudo[i_track], *weightPU);
+        if (PseudoCaloMET[0] > 0 && RecoPUppiMET[0] > 0) vcp_nosel[0].FillHisto1F("Noselbis_P", Pt_pseudo[i]*cosh(Eta[i]), *weightPU);
 
 
-        if (trigger && Flag_allMETFilters[0] == true ) vcp_nosel[0].FillHisto1F("PostTrigger_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), *weightPU);
-        if (triggerONLY && Flag_allMETFilters[0] == true) vcp_nosel[0].FillHisto1F("PostTriggerbis_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), *weightPU);
+        if (PF_type[i]==13) vcp_nosel[0].FillHisto2F("trackPT_vs_trackPseudoTrackPT__PFmuon", Pt[i], Pt_pseudo[i], *weightPU);
+        if (PF_type[i]==211) vcp_nosel[0].FillHisto2F("trackPT_vs_trackPseudoTrackPT__PFpion", Pt[i], Pt_pseudo[i], *weightPU);
+        vcp_nosel[0].FillHisto2F("trackPT_vs_trackPseudoTrackPT", Pt[i], Pt_pseudo[i], *weightPU);
+        vcp_nosel[0].FillHisto2F("trackETA_vs_trackPseudoTrackETA", Eta[i], Eta_pseudo[i], *weightPU);
+        vcp_nosel[0].FillHisto2F("trackPHI_vs_trackPseudoTrackPHI", Phi[i], Phi_pseudo[i], *weightPU);
+
+
+        if (trigger && Flag_allMETFilters[0] == true ) vcp_nosel[0].FillHisto1F("PostTrigger_P", Pt_pseudo[i]*cosh(Eta[i]), *weightPU);
+        if (triggerONLY && Flag_allMETFilters[0] == true) vcp_nosel[0].FillHisto1F("PostTriggerbis_P", Pt_pseudo[i]*cosh(Eta[i]), *weightPU);
 
         if (trigger && Flag_allMETFilters[0] == true && PseudoCaloMET[0] > 250.) {
-            vcp_nosel[0].FillHisto1F("PostTrigger_PseudoCaloMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), *weightPU);
+            vcp_nosel[0].FillHisto1F("PostTrigger_PseudoCaloMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), *weightPU);
 
-            vcp_nosel[0].FillHisto1F("PostTriggerWsfup_PseudoCaloMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight1Dpseudo_SF_Up);
-            vcp_nosel[0].FillHisto1F("PostTriggerWsf_PseudoCaloMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight1Dpseudo);
-            vcp_nosel[0].FillHisto1F("PostTriggerWsfdown_PseudoCaloMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight1Dpseudo_SF_Down);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsfup_PseudoCaloMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight1Dpseudo_SF_Up);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsf_PseudoCaloMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight1Dpseudo);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsfdown_PseudoCaloMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight1Dpseudo_SF_Down);
         }
         if (trigger && Flag_allMETFilters[0] == true && RecoPUppiMET[0] > 150.) {
-            vcp_nosel[0].FillHisto1F("PostTrigger_PUppiMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), *weightPU);
+            vcp_nosel[0].FillHisto1F("PostTrigger_PUppiMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), *weightPU);
 
-            vcp_nosel[0].FillHisto1F("PostTriggerWsfup_PUppiMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight1Dpuppi_SF_Up);
-            vcp_nosel[0].FillHisto1F("PostTriggerWsf_PUppiMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight1Dpuppi);
-            vcp_nosel[0].FillHisto1F("PostTriggerWsfdown_PUppiMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight1Dpuppi_SF_Down);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsfup_PUppiMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight1Dpuppi_SF_Up);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsf_PUppiMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight1Dpuppi);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsfdown_PUppiMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight1Dpuppi_SF_Down);
         }
         if (trigger && Flag_allMETFilters[0] == true && (PseudoCaloMET[0] > 250. || RecoPUppiMET[0] > 150.)) {
-            vcp_nosel[0].FillHisto1F("PostTrigger_PseudoCaloMETcut_PUppiMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), *weightPU);
+            vcp_nosel[0].FillHisto1F("PostTrigger_PseudoCaloMETcut_PUppiMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), *weightPU);
 
-            vcp_nosel[0].FillHisto1F("PostTriggerWsfup_PseudoCaloMETcut_PUppiMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight_SF_Up);
-            vcp_nosel[0].FillHisto1F("PostTriggerWsf_PseudoCaloMETcut_PUppiMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight);
-            vcp_nosel[0].FillHisto1F("PostTriggerWsfdown_PseudoCaloMETcut_PUppiMETcut_P", Pt_pseudo[i_track]*cosh(Eta[i_track]), AppliedWeight_SF_Down);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsfup_PseudoCaloMETcut_PUppiMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight_SF_Up);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsf_PseudoCaloMETcut_PUppiMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight);
+            vcp_nosel[0].FillHisto1F("PostTriggerWsfdown_PseudoCaloMETcut_PUppiMETcut_P", Pt_pseudo[i]*cosh(Eta[i]), AppliedWeight_SF_Down);
         }
 
 
 
         // ABCD method
         if (isMC) {
-            vcp_nosel[0].FillHisto2F("Nosel_pT_vs_Fpixel", Fpix[i_track], Pt_pseudo[i_track], *weightPU);
+            vcp_nosel[0].FillHisto2F("Nosel_pT_vs_Fpixel", Fpix[i], Pt_pseudo[i], *weightPU);
         }
-        else if (!isMC && (Pt_pseudo[i_track] < 70 || Fpix[i_track] <= 0.9)) {
-            vcp_nosel[0].FillHisto2F("Nosel_pT_vs_Fpixel", Fpix[i_track], Pt_pseudo[i_track], *weightPU);
+        else if (!isMC && (Pt_pseudo[i] < 70 || Fpix[i] <= 0.9)) {
+            vcp_nosel[0].FillHisto2F("Nosel_pT_vs_Fpixel", Fpix[i], Pt_pseudo[i], *weightPU);
         }
 
-        // ONLY FOR NO SEL
-        i_track++;
-        //-----------------
     }
 
     for(unsigned int s=0;s<selections_.size();s++) { 
@@ -1785,63 +1562,19 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
             double newWeight = AppliedWeight1Dpuppi;
             double massForRegions = GetMass(Pt_pseudo[icand]*cosh(Eta[icand]), Ih_Strip[icand], K, C);
 
-            if(Pt_pseudo[icand] <= ptcut_ && trigger) {
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix4) ) vmrp_regionA_3f4[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix6) ) vmrp_regionA_3f6[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix8) ) vmrp_regionA_3f8[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix9) ) vmrp_regionA_3f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix4) && (Fpix[icand] <= fpix5) ) vmrp_regionA_4f5[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix5) && (Fpix[icand] <= fpix6) ) vmrp_regionA_5f6[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix6) && (Fpix[icand] <= fpix7) ) vmrp_regionA_6f7[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix6) && (Fpix[icand] <= fpix9) ) vmrp_regionA_6f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix7) && (Fpix[icand] <= fpix8) ) vmrp_regionA_7f8[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix8) && (Fpix[icand] <= fpix9) ) vmrp_regionA_8f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix9) && (Fpix[icand] <= fpix10) ) vmrp_regionA_9f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix99) && (Fpix[icand] <= fpix10) ) vmrp_regionA_99f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix999) && (Fpix[icand] <= fpix10) ) vmrp_regionA_999f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix4) ) vmrp_regionB_3f4[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix6) ) vmrp_regionB_3f6[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix8) ) vmrp_regionB_3f8[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix9) ) vmrp_regionB_3f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix4) && (Fpix[icand] <= fpix5) ) vmrp_regionB_4f5[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix5) && (Fpix[icand] <= fpix6) ) vmrp_regionB_5f6[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix6) && (Fpix[icand] <= fpix7) ) vmrp_regionB_6f7[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix6) && (Fpix[icand] <= fpix9) ) vmrp_regionB_6f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix7) && (Fpix[icand] <= fpix8) ) vmrp_regionB_7f8[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix8) && (Fpix[icand] <= fpix9) ) vmrp_regionB_8f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix8) && (Fpix[icand] <= fpix10) ) vmrp_regionB_8f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix9) && (Fpix[icand] <= fpix10) ) vmrp_regionB_9f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix99) && (Fpix[icand] <= fpix10) ) vmrp_regionB_99f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix999) && (Fpix[icand] <= fpix10) ) vmrp_regionB_999f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-            }
-            else if (Pt_pseudo[icand] > ptcut_ && trigger) {
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix4) ) vmrp_regionC_3f4[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix6) ) vmrp_regionC_3f6[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix8) ) vmrp_regionC_3f8[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix9) ) vmrp_regionC_3f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix4) && (Fpix[icand] <= fpix5) ) vmrp_regionC_4f5[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix5) && (Fpix[icand] <= fpix6) ) vmrp_regionC_5f6[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix6) && (Fpix[icand] <= fpix7) ) vmrp_regionC_6f7[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix6) && (Fpix[icand] <= fpix9) ) vmrp_regionC_6f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix7) && (Fpix[icand] <= fpix8) ) vmrp_regionC_7f8[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix8) && (Fpix[icand] <= fpix9) ) vmrp_regionC_8f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix4) ) vmrp_regionD_3f4[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix3) && (Fpix[icand] <= fpix8) ) vmrp_regionD_3f8[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix4) && (Fpix[icand] <= fpix5) ) vmrp_regionD_4f5[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix5) && (Fpix[icand] <= fpix6) ) vmrp_regionD_5f6[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix6) && (Fpix[icand] <= fpix7) ) vmrp_regionD_6f7[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix6) && (Fpix[icand] <= fpix9) ) vmrp_regionD_6f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix7) && (Fpix[icand] <= fpix8) ) vmrp_regionD_7f8[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix8) && (Fpix[icand] <= fpix9) ) vmrp_regionD_8f9[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix8) && (Fpix[icand] <= fpix10) ) vmrp_regionD_8f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix9) && (Fpix[icand] <= fpix10) ) vmrp_regionD_9f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix99) && (Fpix[icand] <= fpix10) ) vmrp_regionD_99f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
-                if( (Fpix[icand] > fpix999) && (Fpix[icand] <= fpix10) ) vmrp_regionD_999f10[s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
+            if (trigger) {
+                // regions A and B take the candidates with pT <= ptcut, C and D those above it;
+                // a slice of kRegionSlices is filled when fpixLo < Fpix <= fpixHi
+                const bool belowPtCut = Pt_pseudo[icand] <= ptcut_;
+                const bool abovePtCut = Pt_pseudo[icand] > ptcut_;
+                for (size_t r = 0; r < kNRegionSlices; ++r) {
+                    const RegionSlice& reg = kRegionSlices[r];
+                    if (!(reg.belowPtCut ? belowPtCut : abovePtCut)) continue;
+                    if (Fpix[icand] > reg.fpixLo && Fpix[icand] <= reg.fpixHi)
+                        vmrp_[r][s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
+                }
 
-
-                if (!isSignal && Fpix[icand] > fpix8 && massForRegions >= 1500) {
+                if (abovePtCut && !isSignal && Fpix[icand] > kFpix8 && massForRegions >= 1500) {
                     // une seule fois avant la boucle
                     cout << "Mass PFid MET Pt_pseudo Pt Eta NbPixHit NOM FOVH HP chi2 dz dxy PFiso TrkIso EoP ptErr/pt2 ptErr/pt Fpix Ih" << endl;
                     cout << massForRegions << " "
@@ -1869,7 +1602,7 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
 
             if (isMC) { 
                 if (Pt_pseudo[icand] > ptcut_) {
-                    if (trigger && Fpix[icand] > fpix9 && Fpix[icand] <= fpix10) {
+                    if (trigger && Fpix[icand] > kFpix9 && Fpix[icand] <= kFpix10) {
                         vcp[s].FillHisto1F(selLabels_[s] + "_9fp10_SignalMass_nominal", massForRegions, AppliedWeight1Dpuppi);
                         vcp[s].FillHisto1F(selLabels_[s] + "_9fp10_SignalMass_ATLASdata", findMass(Pt_pseudo[icand]*cosh(Eta[icand]), Ih_Strip[icand], "2024data"), AppliedWeight1Dpuppi);
                         vcp[s].FillHisto1F(selLabels_[s] + "_9fp10_SignalMass_ATLASbkg", findMass(Pt_pseudo[icand]*cosh(Eta[icand]), Ih_Strip[icand], "2024bkg"), AppliedWeight1Dpuppi);
@@ -1891,12 +1624,12 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
                     }
                     
                         // Jet Up/Down
-                    if (trigger_varUP && isOkforPUppiMET_up && Fpix[icand] > fpix9 && Fpix[icand] <= fpix10) vcp[s].FillHisto1F(selLabels_[s] + "_9fp10_SignalMass_JetUp", massForRegions, AppliedWeight1Dpuppi);
-                    if (trigger_varDOWN && isOkforPUppiMET_down && Fpix[icand] > fpix9 && Fpix[icand] <= fpix10) vcp[s].FillHisto1F(selLabels_[s] + "_9fp10_SignalMass_JetDown", massForRegions, AppliedWeight1Dpuppi);
+                    if (trigger_varUP && isOkforPUppiMET_up && Fpix[icand] > kFpix9 && Fpix[icand] <= kFpix10) vcp[s].FillHisto1F(selLabels_[s] + "_9fp10_SignalMass_JetUp", massForRegions, AppliedWeight1Dpuppi);
+                    if (trigger_varDOWN && isOkforPUppiMET_down && Fpix[icand] > kFpix9 && Fpix[icand] <= kFpix10) vcp[s].FillHisto1F(selLabels_[s] + "_9fp10_SignalMass_JetDown", massForRegions, AppliedWeight1Dpuppi);
                 }
 
                 if (Pt_pseudo[icand] > ptcut_) {
-                    if (trigger && Fpix[icand] > fpix99 && Fpix[icand] <= fpix10) {
+                    if (trigger && Fpix[icand] > kFpix99 && Fpix[icand] <= kFpix10) {
                         vcp[s].FillHisto1F(selLabels_[s] + "_99fp10_SignalMass_nominal", massForRegions, AppliedWeight1Dpuppi);
                         vcp[s].FillHisto1F(selLabels_[s] + "_99fp10_SignalMass_ATLASbkg", findMass(Pt_pseudo[icand]*cosh(Eta[icand]), Ih_Strip[icand], "2024data"), AppliedWeight1Dpuppi);
                         vcp[s].FillHisto1F(selLabels_[s] + "_99fp10_SignalMass_ATLASglupion", findMass(Pt_pseudo[icand]*cosh(Eta[icand]), Ih_Strip[icand], "2024glupion"), AppliedWeight1Dpuppi);
@@ -1917,11 +1650,11 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
                     }
 
                         // Jet Up/Down
-                    if (trigger_varUP && isOkforPUppiMET_up && Fpix[icand] > fpix99 && Fpix[icand] <= fpix10) vcp[s].FillHisto1F(selLabels_[s] + "_99fp10_SignalMass_JetUp", massForRegions, AppliedWeight1Dpuppi);
-                    if (trigger_varDOWN && isOkforPUppiMET_down && Fpix[icand] > fpix99 && Fpix[icand] <= fpix10) vcp[s].FillHisto1F(selLabels_[s] + "_99fp10_SignalMass_JetDown", massForRegions, AppliedWeight1Dpuppi);
+                    if (trigger_varUP && isOkforPUppiMET_up && Fpix[icand] > kFpix99 && Fpix[icand] <= kFpix10) vcp[s].FillHisto1F(selLabels_[s] + "_99fp10_SignalMass_JetUp", massForRegions, AppliedWeight1Dpuppi);
+                    if (trigger_varDOWN && isOkforPUppiMET_down && Fpix[icand] > kFpix99 && Fpix[icand] <= kFpix10) vcp[s].FillHisto1F(selLabels_[s] + "_99fp10_SignalMass_JetDown", massForRegions, AppliedWeight1Dpuppi);
                 }
                 if (Pt_pseudo[icand] > ptcut_) {
-                    if (trigger && Fpix[icand] > fpix8 && Fpix[icand] <= fpix9) {
+                    if (trigger && Fpix[icand] > kFpix8 && Fpix[icand] <= kFpix9) {
                         vcp[s].FillHisto1F(selLabels_[s] + "_8fp9_SignalMass_nominal", massForRegions, AppliedWeight1Dpuppi);
                         vcp[s].FillHisto1F(selLabels_[s] + "_8fp9_SignalMass_ATLASbkg", findMass(Pt_pseudo[icand]*cosh(Eta[icand]), Ih_Strip[icand], "2024data"), AppliedWeight1Dpuppi);
                         vcp[s].FillHisto1F(selLabels_[s] + "_8fp9_SignalMass_ATLASglupion", findMass(Pt_pseudo[icand]*cosh(Eta[icand]), Ih_Strip[icand], "2024glupion"), AppliedWeight1Dpuppi);
@@ -1942,8 +1675,8 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
                     }
 
                         // Jet Up/Down
-                    if (trigger_varUP && isOkforPUppiMET_up && Fpix[icand] > fpix8 && Fpix[icand] <= fpix9) vcp[s].FillHisto1F(selLabels_[s] + "_8fp9_SignalMass_JetUp", massForRegions, AppliedWeight1Dpuppi);
-                    if (trigger_varDOWN && isOkforPUppiMET_down && Fpix[icand] > fpix8 && Fpix[icand] <= fpix9) vcp[s].FillHisto1F(selLabels_[s] + "_8fp9_SignalMass_JetDown", massForRegions, AppliedWeight1Dpuppi);
+                    if (trigger_varUP && isOkforPUppiMET_up && Fpix[icand] > kFpix8 && Fpix[icand] <= kFpix9) vcp[s].FillHisto1F(selLabels_[s] + "_8fp9_SignalMass_JetUp", massForRegions, AppliedWeight1Dpuppi);
+                    if (trigger_varDOWN && isOkforPUppiMET_down && Fpix[icand] > kFpix8 && Fpix[icand] <= kFpix9) vcp[s].FillHisto1F(selLabels_[s] + "_8fp9_SignalMass_JetDown", massForRegions, AppliedWeight1Dpuppi);
                 }
 
 
@@ -2016,28 +1749,23 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
     }
 
 
-    i_track = 0;
     int countMatching = 0;
-    for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    // Every candidate
-
-        if (!HSCP_hasTrack[j]) continue;
+    for (int i = 0; i < nTracks; ++i) {
 
         for (unsigned int k = 0; k < GenPart_pt.GetSize(); k++) {
             if (fabs(GenPart_pdgId[k]) > 100000) {
-                double dRgen = deltaR(Eta[i_track], Phi[i_track], GenPart_eta[k], GenPart_phi[k]);
+                double dRgen = deltaR(Eta[i], Phi[i], GenPart_eta[k], GenPart_phi[k]);
                 if (dRgen < 0.05) {
                     countMatching++;
 
-                    vcp_nosel[0].FillHisto2F("trackPT_vs_trackPseudoTrackPT__HSCPmatched", Pt[i_track], Pt_pseudo[i_track], *weightPU);
-                    vcp_nosel[0].FillHisto1F("GenHSCPmatching__PFType", PF_type[i_track], *weightPU);
-                    vcp_nosel[0].FillHisto1F("GenHSCPmatching__HSCP_type", HSCP_type[i_track], *weightPU);
-                    if (trigger) vcp_nosel[0].FillHisto1F("GenHSCPmatching__PFType__if_ORtrigger", PF_type[i_track], *weightPU);
+                    vcp_nosel[0].FillHisto2F("trackPT_vs_trackPseudoTrackPT__HSCPmatched", Pt[i], Pt_pseudo[i], *weightPU);
+                    vcp_nosel[0].FillHisto1F("GenHSCPmatching__PFType", PF_type[i], *weightPU);
+                    vcp_nosel[0].FillHisto1F("GenHSCPmatching__HSCP_type", HSCP_type[i], *weightPU);
+                    if (trigger) vcp_nosel[0].FillHisto1F("GenHSCPmatching__PFType__if_ORtrigger", PF_type[i], *weightPU);
 
                 }
             }
         }
-
-        i_track++;
     }
     vcp_nosel[0].FillHisto1F("Nosel_Gen__nMatchedTrack", countMatching, *weightPU);
 
@@ -2104,18 +1832,14 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
 
 
 
-    i_track = 0;
     bool hadPassed_PartialHSCP = false; // No trigger + No PseudoMET cut
-    for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    // Every candidate
+    for (int i = 0; i < nTracks; ++i) {
 
-        if (!HSCP_hasTrack[j]) continue;
-
-        bool hadPassedHSCP = false;
-        if ( (*HLT_PFMET120_PFMHT120_IDTight || *HLT_PFHT500_PFMET100_PFMHT100_IDTight || *HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60 || *HLT_MET105_IsoTrk50) && (Flag_allMETFilters[0] == true) && (PseudoCaloMET[0] > 170.) && (Pt[i_track] > 50.0) && (Pt_pseudo[i_track] > 50.0) && (std::abs(Eta[i_track]) < 2.4) && (NbPixelHit_noL1[i_track] >= 2) && (FracOfValidHit[i_track] > 0.8) && (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.1) && (std::abs(dxy[i_track]) < 0.02) && (miniRelIsoAll[i_track] < 0.02) && (EoP[i_track] < 0.3) && (IsoSumPt_dr03[i_track] < 15) && (ptOverptErrptErr[i_track] < 0.0008) && (Fpix[i_track] > 0.3) && (ptOverptErr[i_track] < 1) && (Ih_Strip[i_track] > 2.9784)) hadPassedHSCP = true;
+        const bool hadPassedHSCP = anyMETtrigger && (Flag_allMETFilters[0] == true) && (PseudoCaloMET[0] > 170.) && tcuts[i].fullDataC();
 
         for (unsigned int k = 0; k < GenPart_pt.GetSize(); k++) {
             if (fabs(GenPart_pdgId[k]) > 100000) {
-                double dRgen = deltaR(Eta[i_track], Phi[i_track], GenPart_eta[k], GenPart_phi[k]);
+                double dRgen = deltaR(Eta[i], Phi[i], GenPart_eta[k], GenPart_phi[k]);
                 if (hadPassedHSCP && dRgen < 0.01 && fabs(GenPart_charge[k]) > 0) {
                     vcp_nosel[0].FillHisto1F("HSCPsel_GenHSCPcharged_Eta", GenPart_eta[k], AppliedWeight1Dpuppi);
                     break;
@@ -2123,9 +1847,7 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
             }
         }
 
-        if ( (Flag_allMETFilters[0] == true) && (Pt[i_track] > 50.0) && (Pt_pseudo[i_track] > 50.0) && (std::abs(Eta[i_track]) < 2.4) && (NbPixelHit_noL1[i_track] >= 2) && (FracOfValidHit[i_track] > 0.8) && (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.1) && (std::abs(dxy[i_track]) < 0.02) && (miniRelIsoAll[i_track] < 0.02) && (EoP[i_track] < 0.3) && (IsoSumPt_dr03[i_track] < 15) && (ptOverptErrptErr[i_track] < 0.0008) && (Fpix[i_track] > 0.3) && (ptOverptErr[i_track] < 1) && (Ih_Strip[i_track] > 2.9784)) hadPassed_PartialHSCP = true;
-
-        i_track++;
+        if ((Flag_allMETFilters[0] == true) && tcuts[i].fullDataC()) hadPassed_PartialHSCP = true;
     }
 
 
@@ -2182,20 +1904,15 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
 
 
     // dEdx on gluino:
-    i_track = 0;
-    for(unsigned int j=0; j<HSCP_hasTrack.GetSize(); j++){    // Every candidate
+    for (int i = 0; i < nTracks; ++i) {
+        const TrackCuts& t = tcuts[i];
+        if (t.nPix && t.fovh && t.nom && t.highPurity && t.chi2Cut && (std::abs(dz[i]) < 0.5) && (std::abs(dxy[i]) < 0.5) && (ptOverptErr[i] < 0.25)) {
 
-        if (!HSCP_hasTrack[j]) continue;
-
-        if (( (NbPixelHit_noL1[i_track] >= 2) && (FracOfValidHit[i_track] > 0.8) && (NOM_noL1[i_track] >= 10) && (isHighPurityTrack[i_track] == true) && (normChi2[i_track] < 5.0) && (std::abs(dz[i_track]) < 0.5) && (std::abs(dxy[i_track]) < 0.5) && (ptOverptErr[i_track] < 0.25) )) {
-
-            if (Ih_Strip[i_track] >= -20./1500*P[i_track] + 20) {
-                vcp_nosel[0].FillHisto2F("dEdX0stripVsP", P[i_track], Ih_Strip[i_track]);
-                if (fabs(Eta[i_track]) < 1) vcp_nosel[0].FillHisto2F("dEdX0stripVsP__large", P[i_track], Ih_Strip[i_track]);
+            if (Ih_Strip[i] >= -20./1500*P[i] + 20) {
+                vcp_nosel[0].FillHisto2F("dEdX0stripVsP", P[i], Ih_Strip[i]);
+                if (fabs(Eta[i]) < 1) vcp_nosel[0].FillHisto2F("dEdX0stripVsP__large", P[i], Ih_Strip[i]);
             }
         }
-
-        i_track++;
     }
 
     
@@ -2214,58 +1931,7 @@ void HSCPSelector::SlaveTerminate() {
     if (fillNosel_) for(auto obj: vcp_nosel) obj.AddToList(fOutput);
     else std::cout << "No-selection histograms not written (fillNosel = 0)" << std::endl;
 
-    for(auto obj: vmrp_regionA_3f4) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_3f6) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_3f8) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_3f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_4f5) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_5f6) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_6f7) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_6f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_7f8) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_8f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_9f10) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_99f10) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionA_999f10) obj.addToList(fOutput);
-
-    for(auto obj: vmrp_regionB_3f4) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_3f6) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_3f8) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_3f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_4f5) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_5f6) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_6f7) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_6f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_7f8) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_8f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_8f10) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_9f10) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_99f10) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionB_999f10) obj.addToList(fOutput);
-
-    for(auto obj: vmrp_regionC_3f4) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_3f6) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_3f8) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_3f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_4f5) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_5f6) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_6f7) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_6f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_7f8) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionC_8f9) obj.addToList(fOutput);
-
-    for(auto obj: vmrp_regionD_3f4) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_3f8) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_4f5) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_5f6) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_6f7) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_6f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_7f8) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_8f9) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_8f10) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_9f10) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_99f10) obj.addToList(fOutput);
-    for(auto obj: vmrp_regionD_999f10) obj.addToList(fOutput);
+    for (auto& slice : vmrp_) for (auto& obj : slice) obj.addToList(fOutput);
 
 }
 
