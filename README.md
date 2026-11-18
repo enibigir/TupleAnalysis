@@ -52,12 +52,13 @@ Before the first run, adapt the site-specific paths listed [below](#site-specifi
 | `python/hscp/` | shared code of the tools: configuration files (`config.py`), selector generation (`selector.py`), running the driver (`driver.py`) |
 | `launch.sh`, `python/launch.py` | run the selector on samples chosen by name, pattern or dataset |
 | `python/CreateSelector.py` | generate `macros/HSCPSelector.{h,C}` by hand (the launcher and the submitter do it themselves) |
-| `macros/HSCPTemplate.{h,C}` | the analysis code: templates of the selector. **Edit these**, not `HSCPSelector.{h,C}`, which are regenerated at each launch |
+| `macros/HSCPTemplate.{h,C}` | the analysis code: templates of the selector. **Edit these**, not `HSCPSelector.{h,C}`, which are regenerated at each launch and not kept in git |
 | `macros/macro.cc` | driver: builds the chain of the ntuples of a file list and runs the selector; called by `launch.sh` and the Condor jobs |
 | `condor/` | `submit.py`, `runJob.sh`, `merge.py`: run the samples as HTCondor jobs and merge the outputs |
 | `tests/` | unit tests of `python/hscp` (`test_hscp.py`) and the smoke test on a synthetic ntuple (`run_smoke.sh`) |
 | `macros/CombineHistos.C` | plotting macro, reads `output/` and writes `outputDisplay/` |
 | `python/DeriveSF.py` | computes the trigger scale factors and writes the three tables |
+| `python/Weight.py` | weights the simulated samples by cross-section and adds them into `<dataset>_weighted.root` |
 | `output/` | where the plotting macros expect the selector outputs (content not tracked) |
 | `outputDisplay/` | plots (content not tracked) |
 
@@ -82,7 +83,7 @@ One JSON file, read by `launch.sh` and `condor/submit.py` only (`macro.cc` recei
 
 | Key | Meaning |
 |---|---|
-| `prod_dir` | directory of the ntuples and of their file lists; overridden by `--prod-dir` or the environment variable `HSCP_PROD_DIR` |
+| `prod_dir` | directory of the ntuples and of their file lists; overridden by `--prod-dir` or the environment variable `HSCP_PROD_DIR`. An empty string means the repository itself, so `"list": "input/x.txt"` is the file `input/x.txt` of the checkout |
 | `binning` | default pT cut (`ptcut`, separating regions A, B from C, D) and bin counts `etabins`, `ihbins`, `pbins`, `massbins`, `fpixbins` of the region histograms |
 | `samples` | one entry per sample name, see below |
 
@@ -92,7 +93,7 @@ A **sample** is one entry, for example `JetMET2024C`; a **dataset** is the group
 "Stop_Run3_MET_madgraph_700": {"file": "SIGNAL/V21p0/HSCP-Stop_Par-M-700_merged.root", "type": "signal", "dataset": "Stop", "mass": 700}
 ```
 
-The binning drives the memory used: with 96 η, 400 Ih, 1000 p, 400 mass and 20 Fpix bins, the region histograms take about 1.8 GB **per selection**.
+The binning drives the memory used: with 96 η, 400 Ih, 1000 p, 400 mass and 20 Fpix bins, the region histograms take about 0.7 GB **per selection**. They are filled in 18 disjoint Fpix intervals per selection and added into the 49 slices of the output when it is written (`regionIntervals` and `writeRegionSlices` in `macros/HSCPTemplate.{h,C}`); a slice added to `kRegionSlices` gets its intervals automatically.
 
 ### `cfg/selections.json`
 
@@ -176,7 +177,14 @@ The list and binning of the region histograms are documented in [`doc/src_inc.md
 - **`macros/CombineHistos.C`**, run from `macros/` with `root -l -b -q CombineHistos.C`. Its main function, at the end of the file, is a list of calls: enable a plot by uncommenting its call. Input files are read from `../output/<sample>_V<n>/`. Plots are written to `../outputDisplay/` and to its sub-directories `TriggEff/` and `Nm1plots/`, which must exist beforehand; a few functions take their output directory as an argument.
 - **`python/DeriveSF.py`** computes the trigger scale factors, in bins of pseudo MET, of PUppi MET, and of both. Its paths are relative to the repository, so it can be started from anywhere: `python3 python/DeriveSF.py`.
 
-Merging the selector outputs and weighting the simulated samples by cross-section (the `*_weighted.root` files read by `CombineHistos.C`) is done outside this repository.
+The `*_weighted.root` files read by `CombineHistos.C` are made by **`python/Weight.py`** from the per-sample outputs (`condor/merge.py` or `launch.sh`):
+
+```bash
+python3 python/Weight.py --dataset QCD2024 --input-dir condor/work/qcd/merged --dry-run      # print the factors
+python3 python/Weight.py --dataset QCD2024 --input-dir condor/work/qcd/merged -o output/QCD2024_V16/QCD2024_mu_V16p2_weighted.root
+```
+
+Each simulated sample is scaled by `xsec × luminosity / sum of weights` and the samples are added. `xsec` (pb) is set per sample in `cfg/datasets.json`, the luminosity (pb⁻¹) by `--lumi` or the top-level `luminosity`. The sum of weights is the sample's `sum_weights` in `cfg/datasets.json` if given, else bin 1 of its `EventCutflow` histogram (the sum of `weightPU` over all events read): give `sum_weights` if the ntuples were skimmed or the generator weights are not all 1. Data samples are only added.
 
 ### Trigger scale-factor tables
 

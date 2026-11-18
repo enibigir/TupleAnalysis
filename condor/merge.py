@@ -6,7 +6,10 @@ Check the outputs of a condor/submit.py working directory and merge them with ha
     python3 condor/merge.py condor/work/<tag> --check    # check only
     python3 condor/merge.py condor/work/<tag> --force    # merge even if chunks are missing
 
-For each sample, every chunk of every selection group must be present in out/.
+For each sample, every chunk of every selection group must be present where the jobs wrote it:
+condor/work/<tag>/out/, or the --out-dir given to submit.py (recorded in <work>/output_dir.txt),
+a local directory or a URL. A root:// directory is listed with xrdfs, any other URL with gfal-ls,
+and hadd reads the remote files directly (it needs the grid proxy).
 Missing jobs are written to <work>/resubmit.txt; submit them again with
     condor_submit <work>/hscp.sub -queue 'dataset, ... from resubmit.txt'   (same column order)
 or simply:  cd <work> && cp resubmit.txt jobs.txt && condor_submit hscp.sub
@@ -14,7 +17,7 @@ or simply:  cd <work> && cp resubmit.txt jobs.txt && condor_submit hscp.sub
 Complete samples are merged into <work>/merged/<sample>.root with "hadd -T"
 (histograms only). Histograms present in several chunks are summed; the groups contribute
 disjoint histogram names, and the no-selection histograms come from group 0 only.
-Needs hadd in the PATH (source env.sh).
+Needs hadd in the PATH (source env.sh), and xrdfs or gfal-ls for a remote --out-dir.
 """
 
 import argparse
@@ -22,6 +25,9 @@ import os
 import shutil
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
+from hscp import storage  # noqa: E402
 
 
 def main():
@@ -46,12 +52,17 @@ def main():
                 continue
             per_sample.setdefault(parts[0], []).append((parts[3], line.rstrip("\n")))
 
+    location = storage.read_location(work)
+    try:
+        sizes = storage.listing(location)
+    except storage.StorageError as e:
+        sys.exit(f"merge: cannot list the job outputs in {location}:\n{e}")
+    print(f"job outputs: {location} ({len(sizes)} files)\n")
+
     missing_lines = []
     complete = []
     for key, entries in sorted(per_sample.items()):
-        missing = [job for out, job in entries
-                   if not os.path.isfile(os.path.join(work, "out", out))
-                   or os.path.getsize(os.path.join(work, "out", out)) < args.min_size]
+        missing = [job for out, job in entries if sizes.get(out, 0) < args.min_size]
         status = "complete" if not missing else f"{len(missing)} / {len(entries)} missing"
         print(f"{key:<32} {len(entries):4d} jobs  {status}")
         missing_lines += missing
@@ -76,8 +87,7 @@ def main():
     os.makedirs(merged_dir, exist_ok=True)
     failed = 0
     for key in complete:
-        inputs = [os.path.join(work, "out", out) for out, _ in per_sample[key]
-                  if os.path.isfile(os.path.join(work, "out", out))]
+        inputs = [storage.join(location, out) for out, _ in per_sample[key] if sizes.get(out, 0) >= args.min_size]
         target = os.path.join(merged_dir, f"{key}.root")
         print(f"\nhadd -T -f {target}  ({len(inputs)} files)")
         r = subprocess.run(["hadd", "-T", "-f", target] + inputs, stdout=subprocess.DEVNULL)

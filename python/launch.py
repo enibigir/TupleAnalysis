@@ -34,7 +34,7 @@ def parse_args(argv):
     ap.add_argument("--dataset", action="append", default=[], metavar="NAME", help="all samples of a dataset (repeatable)")
     ap.add_argument("--list", action="store_true", help="print the matching samples and exit")
     ap.add_argument("--dry-run", action="store_true", help="print the root commands and exit")
-    ap.add_argument("--out-dir", default=os.path.join(config.REPO, "output"),
+    ap.add_argument("-o", "--out-dir", default=os.path.join(config.REPO, "output"),
                     help="where the outputs and logs go (default: output/)")
     ap.add_argument("--label", default="", help="suffix of the output files: <sample>_<label>.root")
     ap.add_argument("--jobs", type=int, default=1, help="samples run at the same time (each with 1 thread)")
@@ -104,7 +104,10 @@ def main(argv=None):
     def run(item):
         n, flist, out, log = item
         rc = driver.run_dataset(n, flist, out, True, cfg.binning(n), log, threads=threads)
-        print(f"{'ok  ' if rc == 0 else 'FAIL'}  {n:<34} -> {out if rc == 0 else log}", flush=True)
+        if rc == 0:
+            print(f"ok    {n:<34} -> {out}", flush=True)
+        else:
+            print(f"FAIL  {n:<34} -> {log}  ({driver.describe_exit(rc)})", flush=True)
         return n, rc
 
     if args.jobs > 1:

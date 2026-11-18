@@ -8,7 +8,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "python"))
-from hscp import config, driver, selector  # noqa: E402
+from hscp import config, driver, proxy, selector, storage, weight  # noqa: E402
 
 
 class ConfigTests(unittest.TestCase):
@@ -35,6 +35,15 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("JetMET2024", cfg.datasets())
         self.assertEqual(cfg.dataset("JetMET2024C"), "JetMET2024")
         self.assertEqual(len(cfg.select(datasets=["JetMET2024"])), 7)
+
+    def test_empty_prod_dir_is_the_repository(self):
+        doc = dict(self.DOC, prod_dir="")
+        self.assertEqual(self._cfg(doc).prod_dir, config.REPO + "/")
+        self.assertEqual(self._cfg(doc, prod_dir="/arg").prod_dir, "/arg/")
+        self.assertEqual(self._cfg(doc).source("A"), ("list", config.REPO + "/L/a.txt"))
+        missing = {k: v for k, v in self.DOC.items() if k != "prod_dir"}
+        with self.assertRaises(config.ConfigError):
+            self._cfg(missing)
 
     def test_prod_dir_precedence(self):
         self.assertEqual(self._cfg().prod_dir, "/p/")
@@ -186,6 +195,20 @@ class DriverTests(unittest.TestCase):
                          'macro.cc("D","/l.txt","o.root",false,72.5,1,2,3,4,5)')
         self.assertEqual(driver.root_command("D", "", "o.root", True, b)[:4], ["root", "-l", "-b", "-q"])
 
+    def test_describe_exit(self):
+        self.assertEqual(driver.describe_exit(0), "exit code 0")
+        self.assertIn("no output file", driver.describe_exit(driver.NO_OUTPUT))
+        self.assertIn("signal 9 (SIGKILL)", driver.describe_exit(-9))
+        self.assertIn("memory", driver.describe_exit(-9))
+        self.assertIn("segmentation", driver.describe_exit(-11))
+        self.assertIn("processing failed", driver.describe_exit(3))
+        self.assertIn("signal 9 (SIGKILL) in a wrapper", driver.describe_exit(137))
+        # the root launcher returns the signal of root.exe as its exit code
+        self.assertIn("root.exe was killed by signal 9 (SIGKILL)", driver.describe_exit(9))
+        self.assertIn("memory", driver.describe_exit(9))
+        self.assertIn("segmentation", driver.describe_exit(11))
+        self.assertEqual(driver.describe_exit(1), "exit code 1")
+
     def test_build_loads_libtools_before_compiling(self):
         cmd = driver.build_command()
         self.assertIn('gSystem->Load("../libTools.so")', cmd)
@@ -196,6 +219,153 @@ class DriverTests(unittest.TestCase):
         with open(os.path.join(os.path.dirname(HERE), "condor", "runJob.sh")) as f:
             script = f.read()
         self.assertIn('macro.cc(\\"$SAMPLE\\",\\"$CHUNK_ABS\\",\\"$OUT_ABS\\",$NOSEL,$PTCUT,$ETABINS,$IHBINS,$PBINS,$MASSBINS,$FPIXBINS)', script)
+
+
+class ProxyTests(unittest.TestCase):
+    LOCAL = ["/data/a.root", "file:///data/b.root"]
+    REMOTE = LOCAL + ["davs://host//store/c.root"]
+
+    def setUp(self):
+        f = tempfile.NamedTemporaryFile(delete=False)
+        f.close()
+        self.addCleanup(os.remove, f.name)
+        self.file = f.name
+        self._env = os.environ.pop("X509_USER_PROXY", None)
+        self.addCleanup(lambda: os.environ.__setitem__("X509_USER_PROXY", self._env) if self._env
+                        else os.environ.pop("X509_USER_PROXY", None))
+
+    def test_remote_detection(self):
+        self.assertFalse(any(proxy.is_remote(f) for f in self.LOCAL))
+        self.assertTrue(proxy.is_remote("root://eos//x.root"))
+
+    def test_auto(self):
+        long = lambda p: 100 * 3600   # noqa: E731
+        self.assertEqual(proxy.resolve("auto", self.LOCAL, 3600, long), (None, None))
+        os.environ["X509_USER_PROXY"] = self.file
+        self.assertEqual(proxy.resolve("auto", self.REMOTE, 3600, long), (self.file, 100 * 3600))
+        os.environ["X509_USER_PROXY"] = self.file + ".missing"
+        with self.assertRaisesRegex(proxy.ProxyError, "voms-proxy-init"):
+            proxy.resolve("auto", self.REMOTE, 3600, long)
+
+    def test_none_and_explicit_path(self):
+        self.assertEqual(proxy.resolve("none", self.REMOTE, 3600), (None, None))
+        self.assertEqual(proxy.resolve(self.file, self.LOCAL, 3600, lambda p: None), (self.file, None))
+        with self.assertRaises(proxy.ProxyError):
+            proxy.resolve(self.file + ".missing", self.LOCAL, 3600, lambda p: None)
+
+    def test_lifetime(self):
+        with self.assertRaisesRegex(proxy.ProxyError, "1 h 30 min left"):
+            proxy.resolve(self.file, [], 3600, lambda p: 5400)          # runtime + 1 h = 2 h needed
+        self.assertEqual(proxy.resolve(self.file, [], 3600, lambda p: 7200)[1], 7200)
+
+    def test_sub_line(self):
+        self.assertEqual(proxy.sub_line(None), "")
+        self.assertEqual(proxy.sub_line("/tmp/x509up_u1"), "x509userproxy         = /tmp/x509up_u1\n")
+        self.assertIn("not checked", proxy.describe("/p", None))
+
+
+class WeightTests(unittest.TestCase):
+    DOC = {
+        "prod_dir": "/p/", "luminosity": 1000,
+        "binning": ConfigTests.DOC["binning"],
+        "samples": {
+            "Q1": {"file": "q1.root", "type": "mc", "dataset": "QCD", "xsec": 20},
+            "Q2": {"file": "q2.root", "type": "mc", "dataset": "QCD", "xsec": 3, "sum_weights": 600},
+            "Q3": {"file": "q3.root", "type": "mc", "dataset": "QCD"},
+            "D1": {"file": "d1.root", "type": "data", "dataset": "Data"},
+            "S1": {"file": "s1.root", "type": "signal", "dataset": "Sig", "xsec": 0.5},
+        },
+    }
+
+    def setUp(self):
+        os.environ.pop("HSCP_PROD_DIR", None)
+        self.cfg = config.Config(self.DOC, "test.json")
+        self.read = []
+
+    def _sumw(self, s):
+        self.read.append(s)
+        return 400.0
+
+    def test_config_values(self):
+        self.assertEqual(self.cfg.luminosity, 1000.0)
+        self.assertEqual(self.cfg.xsec("Q1"), 20.0)
+        self.assertIsNone(self.cfg.xsec("Q3"))
+        self.assertEqual(self.cfg.sum_weights("Q2"), 600.0)
+        import copy
+        for bad in ({"xsec": -1}, {"xsec": "1"}, {"sum_weights": 0}, {"xsec": True}):
+            doc = copy.deepcopy(self.DOC)
+            doc["samples"]["Q1"].update(bad)
+            with self.assertRaises(config.ConfigError, msg=bad):
+                config.Config(doc, "t")
+        doc = dict(self.DOC, luminosity=0)
+        with self.assertRaises(config.ConfigError):
+            config.Config(doc, "t")
+
+    def test_factors(self):
+        entries = weight.plan(self.cfg, ["Q1", "Q2"], 1000.0, self._sumw)
+        self.assertEqual([e.factor for e in entries], [20 * 1000 / 400, 3 * 1000 / 600])
+        self.assertEqual([e.source for e in entries], [weight.NORM_HISTO, "datasets.json"])
+        self.assertEqual(self.read, ["Q1"])                       # sum_weights of datasets.json wins
+        self.assertEqual(weight.plan(self.cfg, ["S1"], 2.0, self._sumw)[0].factor, 0.5 * 2 / 400)
+        self.assertIn("luminosity: 1000 pb^-1", weight.table(entries, 1000.0))
+
+    def test_data_is_added_only(self):
+        entries = weight.plan(self.cfg, ["D1"], None, self._sumw)
+        self.assertEqual([(e.type, e.factor) for e in entries], [("data", 1.0)])
+        self.assertEqual(self.read, [])
+
+    def test_errors(self):
+        with self.assertRaisesRegex(weight.WeightError, "data and simulation"):
+            weight.plan(self.cfg, ["D1", "Q1"], 1000.0, self._sumw)
+        with self.assertRaisesRegex(weight.WeightError, "no 'xsec'.*Q3"):
+            weight.plan(self.cfg, ["Q1", "Q3"], 1000.0, self._sumw)
+        with self.assertRaisesRegex(weight.WeightError, "no luminosity"):
+            weight.plan(self.cfg, ["Q1"], None, self._sumw)
+        with self.assertRaisesRegex(weight.WeightError, "Q1: sum of weights 0"):
+            weight.plan(self.cfg, ["Q1"], 1000.0, lambda s: 0.0)
+
+    def test_default_output(self):
+        self.assertEqual(weight.default_output(self.cfg, ["Q1", "Q2"], "m"), os.path.join("m", "QCD_weighted.root"))
+        self.assertIsNone(weight.default_output(self.cfg, ["Q1", "S1"], "m"))
+
+
+class StorageTests(unittest.TestCase):
+    def test_resolve(self):
+        os.environ["HSCP_TEST_USER"] = "me"
+        try:
+            self.assertEqual(storage.resolve("root://cmseos.fnal.gov//store/user/$HSCP_TEST_USER/hscp/", "qcd"),
+                             "root://cmseos.fnal.gov//store/user/me/hscp/qcd")
+        finally:
+            del os.environ["HSCP_TEST_USER"]
+        self.assertEqual(storage.resolve("/data/x/", "t"), "/data/x/t")
+        self.assertEqual(storage.resolve("rel", "t"), os.path.join(os.getcwd(), "rel", "t"))
+        with self.assertRaisesRegex(storage.StorageError, "double slash"):
+            storage.resolve("root://cmseos.fnal.gov/store/user/me", "t")
+        with self.assertRaisesRegex(storage.StorageError, "undefined variable"):
+            storage.resolve("/data/$HSCP_UNDEFINED_VARIABLE", "t")
+
+    def test_join_and_split(self):
+        self.assertEqual(storage.join("root://h//store/a", "f.root"), "root://h//store/a/f.root")
+        self.assertEqual(storage.join("/d", "f.root"), "/d/f.root")
+        self.assertEqual(storage.split_root_url("root://cmseos.fnal.gov:1094//store/user/me/t"),
+                         ("root://cmseos.fnal.gov:1094", "/store/user/me/t"))
+
+    def test_parsers(self):
+        xrdfs = ("-rw-r--r-- me us_cms 7062264 2026-11-17 10:00:00 /store/user/me/t/A_g0_c0.root\n"
+                 "drwxr-xr-x me us_cms 0 2026-11-17 10:00:00 /store/user/me/t/sub\n"
+                 "-r-- 2026-11-17 10:00:01 512 /store/user/me/t/A_g0_c1.root\n")
+        self.assertEqual(storage.parse_xrdfs(xrdfs), {"A_g0_c0.root": 7062264, "A_g0_c1.root": 512})
+        gfal = ("-rw-r--r--   1 0     0      7062264 Nov 17 10:00 A_g0_c0.root\n"
+                "drwxr-xr-x   1 0     0            0 Nov 17 10:00 sub\n")
+        self.assertEqual(storage.parse_gfal(gfal), {"A_g0_c0.root": 7062264})
+
+    def test_location_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(storage.read_location(d), os.path.join(d, "out"))
+            with open(os.path.join(d, storage.LOCATION_FILE), "w") as f:
+                f.write("root://h//store/x/t\n")
+            self.assertEqual(storage.read_location(d), "root://h//store/x/t")
+            self.assertEqual(storage.listing(os.path.join(d, "nothing")), {})
 
 
 if __name__ == "__main__":

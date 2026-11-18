@@ -9,6 +9,8 @@
 #include <TTreeReaderArray.h>
 #include <TEfficiency.h>
 #include <TLorentzVector.h>
+#include <algorithm>
+#include <memory>
 #include <vector>
 #include <iostream>
 #include <limits>
@@ -36,7 +38,8 @@ struct RegionSlice {
    float fpixHi;
 };
 
-// The (region, Fpix slice) pairs, in the order of the output file. To add a slice, add a line here.
+// The (region, Fpix slice) pairs written to the output file. To add a slice, add a line here: the Fpix
+// intervals below follow from this table.
 const RegionSlice kRegionSlices[] = {
    {"_regionA_3fp4",   true,  kFpix3,   kFpix4},
    {"_regionA_3fp6",   true,  kFpix3,   kFpix6},
@@ -92,6 +95,46 @@ const RegionSlice kRegionSlices[] = {
    {"_regionD_999fp10",false, kFpix999, kFpix10},
 };
 const size_t kNRegionSlices = sizeof(kRegionSlices) / sizeof(kRegionSlices[0]);
+
+// The region histograms are filled in disjoint Fpix intervals, and the slices of kRegionSlices are
+// rebuilt from them in Terminate. Every slice is a union of intervals, so the sum gives the same
+// histograms, while a candidate is filled once instead of in up to eight overlapping slices. With the
+// table above: 18 intervals per selection instead of 49 slices, for the same output file.
+struct FpixInterval {
+   bool belowPtCut;
+   float fpixLo;          // fpixLo < Fpix <= fpixHi
+   float fpixHi;
+};
+
+// The intervals needed by kRegionSlices. On each side of the pT cut, the edges of the slices of that
+// side cut the Fpix axis into consecutive intervals, and those covered by a slice are kept.
+// slices[r] receives the indices of the intervals that make up slice r of kRegionSlices.
+inline std::vector<FpixInterval> regionIntervals(std::vector<std::vector<size_t>>& slices)
+{
+   std::vector<FpixInterval> intervals;
+   slices.assign(kNRegionSlices, std::vector<size_t>());
+   for (bool below : {true, false}) {
+      std::vector<float> edges;
+      for (const RegionSlice& s : kRegionSlices) {
+         if (s.belowPtCut != below) continue;
+         edges.push_back(s.fpixLo);
+         edges.push_back(s.fpixHi);
+      }
+      std::sort(edges.begin(), edges.end());
+      edges.erase(std::unique(edges.begin(), edges.end()), edges.end());
+      for (size_t e = 0; e + 1 < edges.size(); ++e) {
+         std::vector<size_t> users;
+         for (size_t r = 0; r < kNRegionSlices; ++r) {
+            const RegionSlice& s = kRegionSlices[r];
+            if (s.belowPtCut == below && s.fpixLo <= edges[e] && edges[e + 1] <= s.fpixHi) users.push_back(r);
+         }
+         if (users.empty()) continue;
+         for (size_t r : users) slices[r].push_back(intervals.size());
+         intervals.push_back({below, edges[e], edges[e + 1]});
+      }
+   }
+   return intervals;
+}
 
 // Cuts on one candidate with a track, evaluated once per event at the top of Process and read by
 // every candidate loop. The thresholds are those of the "common" cuts of cfg/selections.json.
@@ -264,9 +307,14 @@ public :
 
 
    // BACKGROUND ESTIMATION METHOD: HISTOGRAMS
-   // One vector of RegionMassPlot per entry of kRegionSlices, one element per selection:
-   // vmrp_[slice][selection]. The histograms are named <quantity><suffix>_<selection label>.
-   std::vector<std::vector<RegionMassPlot>> vmrp_;
+   // One vector of RegionMassPlot per Fpix interval of regionIntervals(), one element per selection:
+   // vmri_[interval][selection]. Terminate adds them into the slices of kRegionSlices (writeRegionSlices),
+   // named <quantity><suffix>_<selection label>; the intervals themselves are not written.
+   std::vector<FpixInterval> intervals_;
+   std::vector<std::vector<size_t>> sliceIntervals_;   // intervals making up each slice of kRegionSlices
+   std::vector<std::vector<RegionMassPlot>> vmri_;
+   static std::string intervalSuffix(size_t k, const std::string& label) { return "_interval" + std::to_string(k) + "_" + label; }
+   void writeRegionSlices(TFile* out);
    
    HSCPSelector()
    {

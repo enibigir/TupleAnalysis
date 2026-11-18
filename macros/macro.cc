@@ -93,5 +93,11 @@ void macro(const char* sample = "", const char* fileList = "", const char* outFi
     chain.SetCacheSize(200 * 1024 * 1024); // 200 MB
     chain.AddBranchToCache("*", true);
 
-    chain.Process("HSCPSelector.C+", option.c_str());
+    // Process returns -1 when the selector could not run or aborted (e.g. the ntuple does not have the
+    // branches declared in HSCPSelector.h): exit with a non-zero code so that launch.py reports FAIL.
+    const Long64_t status = chain.Process("HSCPSelector.C+", option.c_str());
+    if (status < 0) {
+        std::cerr << "Processing of " << sample << " failed. No output written." << std::endl;
+        gSystem->Exit(3);
+    }
 }

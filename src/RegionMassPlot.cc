@@ -142,6 +142,22 @@ void RegionMassPlot::fill(float eta, float nhits, float p, float pt, float pterr
 }
 
 
+std::vector<TH1*> RegionMassPlot::histograms() const
+{
+    return {ih_pt, ias_pt, ih_ias, ih_fpix, eta_fpix, oP_fpix, ih_nhits, ias_nhits, eta_pt, eta_1oP, eta_p,
+            eta_pterrOpt, nhits_pt, eta_nhits, ih_eta, ih_p, ias_p, pt_pterroverpt, ias_eta, eta_npv, p_npv,
+            ih_npv, mass, mass_p, mass_ih, mass_eta};
+}
+
+
+void RegionMassPlot::addFrom(const RegionMassPlot& other)
+{
+    const std::vector<TH1*> mine = histograms(), theirs = other.histograms();
+    for (size_t i = 0; i < mine.size(); ++i)
+        if (mine[i] && theirs[i]) mine[i]->Add(theirs[i]);
+}
+
+
 void RegionMassPlot::addToList(TList* list)
 {
     auto safeAdd = [&](TObject* o)

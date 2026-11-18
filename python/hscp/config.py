@@ -4,15 +4,19 @@ cfg/datasets.json: the samples of the analysis, where their ntuples are, and the
     {
       "prod_dir": "/scratch/.../HSCP_prod/",
       "binning":  {"ptcut": 70, "etabins": 96, "ihbins": 400, "pbins": 1000, "massbins": 400, "fpixbins": 20},
+      "luminosity": 1000,                       (pb^-1, optional: used by python/Weight.py)
       "samples": {
         "JetMET2024C": {"list": "JetMET2024/V12p310.txt", "type": "data", "dataset": "JetMET2024"},
         "Stop_Run3_MET_madgraph_700": {"file": "SIGNAL/V21p0/HSCP-Stop_Par-M-700_merged.root",
                                        "type": "signal", "dataset": "Stop", "mass": 700,
-                                       "binning": {"etabins": 48}}
+                                       "binning": {"etabins": 48}},
+        "QCD2024_mu_pt80to120": {"list": "input/QCD_Bin-PT-80to120_CodeV16p2.txt", "type": "mc",
+                                 "dataset": "QCD2024", "xsec": 1234.5}
       }
     }
 
-Only Python reads this file. macros/macro.cc receives an explicit file list and the binning as arguments.
+xsec (pb) and sum_weights (optional, the sum of the weights of the events produced) are read by
+python/Weight.py only. Only Python reads this file. macros/macro.cc receives an explicit file list and the binning as arguments.
 """
 
 import fnmatch
@@ -29,7 +33,7 @@ SELECTIONS_FILE = os.path.join(CFG_DIR, "selections.json")
 
 Binning = namedtuple("Binning", "ptcut etabins ihbins pbins massbins fpixbins")
 TYPES = ("data", "mc", "signal")
-ENTRY_KEYS = {"list", "file", "type", "dataset", "mass", "binning", "_comment"}
+ENTRY_KEYS = {"list", "file", "type", "dataset", "mass", "binning", "xsec", "sum_weights", "_comment"}
 
 
 class ConfigError(ValueError):
@@ -46,6 +50,12 @@ def full_path(path, prod):
 def chunked(seq, n):
     for i in range(0, len(seq), n):
         yield seq[i:i + n]
+
+
+def _positive(value, where):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not value > 0:
+        raise ConfigError(f"{where} must be a positive number, not {value!r}")
+    return float(value)
 
 
 def _binning(values, where):
@@ -69,8 +79,12 @@ class Config:
         self.default_binning = _binning(doc["binning"], f"{path}: binning")
         d = prod_dir or os.environ.get("HSCP_PROD_DIR") or doc.get("prod_dir")
         if not d:
-            raise ConfigError(f"{path}: 'prod_dir' missing and HSCP_PROD_DIR not set")
+            if "prod_dir" not in doc:
+                raise ConfigError(f"{path}: 'prod_dir' missing and HSCP_PROD_DIR not set")
+            d = REPO  # "prod_dir": "" means relative to the repository
         self.prod_dir = d if d.endswith("/") else d + "/"
+        lumi = doc.get("luminosity")
+        self.luminosity = None if lumi is None else _positive(lumi, f"{path}: 'luminosity'")
         self.samples = {}
         for name, entry in doc["samples"].items():
             self.samples[name] = self._check(name, entry)
@@ -89,6 +103,9 @@ class Config:
         if "binning" in entry:
             merged = dict(self.default_binning._asdict()); merged.update(entry["binning"])
             _binning(merged, where)
+        for key in ("xsec", "sum_weights"):
+            if key in entry:
+                _positive(entry[key], f"{where}: '{key}'")
         return entry
 
     # ---- queries ----
@@ -105,6 +122,16 @@ class Config:
 
     def type(self, name):
         return self.samples[name]["type"]
+
+    def xsec(self, name):
+        """Cross-section in pb, or None."""
+        x = self.samples[name].get("xsec")
+        return None if x is None else float(x)
+
+    def sum_weights(self, name):
+        """Sum of the weights of the events produced, if given in the file, else None."""
+        x = self.samples[name].get("sum_weights")
+        return None if x is None else float(x)
 
     def binning(self, name):
         entry = self.samples[name]
@@ -150,7 +177,8 @@ class Config:
 
 
 def load(path=DATASETS_FILE, prod_dir=None):
-    """Read and validate datasets.json. prod_dir: argument, else $HSCP_PROD_DIR, else the file's value."""
+    """Read and validate datasets.json. prod_dir: argument, else $HSCP_PROD_DIR, else the file's value;
+    an empty value in the file means the repository."""
     try:
         with open(path) as f:
             doc = json.load(f)

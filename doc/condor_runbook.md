@@ -31,10 +31,19 @@ head -3 $HSCP_PROD_DIR/JetMET2024/V12p310.txt             # the ROOT files must 
 If the ntuples are on storage that the worker nodes cannot mount, the file lists must hold
 `root://` URLs instead of local paths.
 
+For remote files (`davs://`, `root://`), the jobs need a grid proxy that outlives them:
+
+```bash
+voms-proxy-init -voms cms -valid 192:00
+voms-proxy-info --timeleft         # seconds left
+```
+
+`condor/submit.py` adds it to `hscp.sub` by itself (see `--proxy` in section 5).
+
 ## 3. Check the selections and the binning
 
 ```bash
-cat cfg/selections.json            # the cuts and the selections; memory is about 1.7 GB per selection
+cat cfg/selections.json            # the cuts and the selections; memory is about 0.7 GB per selection
 ./launch.sh --list 'JetMET2024*'   # the samples, their type, dataset and binning, from cfg/datasets.json
 ```
 
@@ -71,6 +80,56 @@ python3 condor/submit.py --dataset QCD2024 --tag qcd --cpus 4 --memory '6 GB'   
 python3 condor/submit.py --samples TestMET2024 --tag t1 --requirements '(OpSysAndVer == "AlmaLinux9")'
 ```
 
+Grid proxy: by default (`--proxy auto`), if an input file is remote, `submit.py` writes
+`x509userproxy = <file>` into `hscp.sub`, taking the file from `$X509_USER_PROXY`, else
+`/tmp/x509up_u<uid>`. It stops if the proxy is missing or lives less than `--runtime` + 1 hour.
+Condor copies the proxy to the worker node. `--proxy PATH` uses another file, `--proxy none` adds nothing.
+
+### Where the job outputs go (`--out-dir`)
+
+By default the outputs come back to `condor/work/<tag>/out/`. A full submission writes
+100–150 GB of job outputs, which belongs on EOS rather than in the checkout:
+
+```bash
+python3 condor/submit.py --dataset QCD2024 --tag qcd_v1 \
+        --out-dir 'root://cmseos.fnal.gov//store/user/$USER/hscp/'
+# outputs:     root://cmseos.fnal.gov//store/user/<you>/hscp/qcd_v1  (copied by the jobs)
+```
+
+The outputs go to `<out-dir>/<tag>/`; `$USER` is expanded by `submit.py` if the shell did not.
+With a URL (`root://`, `davs://`, ...), each job copies its own output at the end (`xrdcp` for
+`root://`, `gfal-copy` otherwise, three attempts), and Condor brings back only the logs. A failed
+copy makes the job exit with code 4, so it is held like any other failure. The jobs then need the
+grid proxy, which `--proxy auto` gives them because the output is remote. With a local directory
+instead of a URL, Condor transfers each output there (the submit machine must see it).
+`submit.py` records the location in `condor/work/<tag>/output_dir.txt`, where `merge.py` reads it.
+
+Check that you can write there before submitting many jobs:
+
+```bash
+xrdfs root://cmseos.fnal.gov ls /store/user/$USER          # needs the proxy
+```
+
+#### On CERN LXPLUS
+
+The personal EOS area is `/eos/user/<first letter>/<username>` on `eosuser.cern.ch`. It is
+reached with Kerberos (the LXPLUS login), not the proxy, and has a 1 TB quota by default.
+
+```bash
+xrdfs root://eosuser.cern.ch ls /eos/user/${USER:0:1}/$USER     # like the cmseos listing above
+ls /eos/user/${USER:0:1}/$USER                                  # EOS is also mounted on LXPLUS
+eos ls /eos/user/${USER:0:1}/$USER
+
+python3 condor/submit.py --dataset QCD2024 --tag qcd_v1 \
+        --out-dir 'root://eosuser.cern.ch//eos/user/e/$USER/hscp/'   # write your own first letter
+```
+
+Write the first letter of the username directly: `submit.py` expands `$USER`, but not
+`${USER:0:1}`. CERN's HTCondor passes the Kerberos credentials to the jobs, so `xrdcp` can write
+to `eosuser`. The inputs are still read over `davs://`, so `--proxy auto` still requires a proxy.
+CMS group areas are under `root://eoscms.cern.ch//eos/cms/store/group/...`, and need write
+permission for the group.
+
 Measure the memory on one real job before submitting a whole dataset: submit a single sample with
 `--files-per-job 5`, then read `MemoryUsage` in `log/condor.log` and set `--memory` from it.
 
@@ -94,7 +153,9 @@ python3 condor/merge.py condor/work/jetmet_v1 --check
 cd condor/work/jetmet_v1 && cp resubmit.txt jobs.txt && condor_submit hscp.sub && cd ../../..
 ```
 
-Repeat until `--check` prints `complete` for every sample.
+Repeat until `--check` prints `complete` for every sample. With a remote `--out-dir`, `merge.py`
+lists the directory with `xrdfs` (`root://`) or `gfal-ls` (other URLs); a job whose copy failed
+has no file there and is listed as missing.
 
 ## 8. Merge
 
@@ -104,27 +165,165 @@ python3 condor/merge.py condor/work/jetmet_v1
 ls condor/work/jetmet_v1/merged/   # one <sample>.root per sample
 ```
 
-## 9. Hand the results to the plotting macros
+The merged files are always written locally, in `condor/work/<tag>/merged/`. With a remote
+`--out-dir`, `hadd` reads the job outputs directly from the storage (it needs the proxy).
+
+## 9. Weight the simulation by cross-section
+
+`python/Weight.py` scales every histogram of each simulated sample by
+
+```
+factor = xsec [pb] × luminosity [pb^-1] / sum of weights
+```
+
+then adds the samples into one file. It reads `<input-dir>/<sample>.root`, so it works on the
+`merged/` directory of step 8 as well as on the `--out-dir` of `launch.sh`.
+
+| Input | Where it comes from |
+|---|---|
+| `xsec` | the sample's `xsec` (pb) in `cfg/datasets.json`; for a filtered sample (QCD μ-enriched), σ × filter efficiency |
+| luminosity | `--lumi` (pb^-1) if given, else the top-level `luminosity` of `cfg/datasets.json` |
+| sum of weights | the sample's `sum_weights` in `cfg/datasets.json` if given, else bin 1 of its `EventCutflow` histogram (the sum of `weightPU` over every event read) |
+
+Data samples are only added (factor 1). Data and simulation cannot go into the same output.
 
 ```bash
-mkdir -p output/JetMET2024_V12
-cp condor/work/jetmet_v1/merged/JetMET2024*.root output/JetMET2024_V12/   # the directory name carries the run version
+source env.sh                                      # PyROOT
+
+# 1. check the factors: nothing is written
+python3 python/Weight.py --dataset QCD2024 --input-dir condor/work/qcd/merged --dry-run
+
+# 2. write the weighted file
+python3 python/Weight.py --dataset QCD2024 --input-dir condor/work/qcd/merged \
+        -o output/QCD2024_V16/QCD2024_mu_V16p2_weighted.root
+
+# another luminosity than the one of datasets.json (era C only, for instance), in pb^-1
+python3 python/Weight.py --dataset QCD2024 --input-dir condor/work/qcd/merged --lumi 7000 \
+        -o output/QCD2024_V16/QCD2024_mu_eraC_weighted.root
+
+# single samples or patterns instead of a whole dataset
+python3 python/Weight.py --samples 'TTbar*' --input-dir condor/work/ttbar/merged -o output/TTbar2024/TTbar2024_weighted.root
+
+# data: the eras are added, not scaled
+python3 python/Weight.py --dataset JetMET2024 --input-dir condor/work/jetmet_v1/merged \
+        -o output/JetMET2024_V12/JetMET2024_V12.root
+```
+
+| Option | Meaning |
+|---|---|
+| `--dataset NAME` / `--samples PATTERNS` | the samples to add, as in `submit.py` (`--dataset` can be repeated) |
+| `--input-dir DIR` | the directory holding `<sample>.root` (required) |
+| `-o FILE` | output; by default `<input-dir>/<dataset>_weighted.root` when all samples belong to one dataset |
+| `--lumi L` | luminosity in pb^-1 for this run, instead of the one in `datasets.json` |
+| `--dry-run` | print the table of factors only |
+| `-f` | overwrite an existing output |
+| `--config FILE` | another datasets file |
+
+The dry run prints, for each sample, `xsec`, the sum of weights and where it comes from
+(`EventCutflow` or `datasets.json`), the factor, and the luminosity used. Check that:
+
+- the factors of a binned sample (the 12 QCD bins) change smoothly from one bin to the next;
+- the luminosity line is the one you meant (pb^-1: 7 fb^-1 is `--lumi 7000`).
+
+The default sum of weights is right only if the ntuples hold every event of the dataset (no skim)
+and the generator weights are all 1. Pythia LO samples (QCD) are fine. NLO samples (tt̄ Powheg,
+W+jets) have negative weights that the selector does not read: set their `sum_weights` in
+`cfg/datasets.json` to the sum of generator weights of the events processed. A sample with missing
+jobs is still normalized correctly by the default, which counts only the events read.
+
+Profiles (`*_pfx`) are added with the factors as weights, so their mean values are not scaled. The
+file is written as `<output>.part` and renamed at the end, and histograms are processed one name
+at a time: memory stays small (about 0.6 GB for 20,000 histograms).
+
+## 10. Hand the results to the plotting macros
+
+`CombineHistos.C` reads fixed paths such as `../output/QCD2024_V16/QCD2024_mu_V16p2_weighted.root`:
+write the outputs of step 9 there (`-o`), or edit the paths of the functions you call.
+
+```bash
 cd macros && root -l -b -q CombineHistos.C && cd ..      # enable the wanted plots in its main function
 ls outputDisplay/
 ```
 
-## 10. Trigger scale factors (when the calibration selections were run)
+## 11. Trigger scale factors (when the calibration selections were run)
 
 ```bash
 python3 python/DeriveSF.py         # needs numpy, uproot, matplotlib; writes inc/SF_*.txt
 ```
 
-A new set of tables changes the weights of the simulation: rerun steps 5 to 8 for the
+A new set of tables changes the weights of the simulation: rerun steps 5 to 9 for the
 simulated samples afterwards.
+
+## Example: 2024 production (background, signal, JetMET2024C)
+
+Steps 5 to 9 for the samples that are ready: the background samples with a cross-section, the
+1600 GeV madgraph gluino, and JetMET2024C. One tag per group, so that each is checked, merged and
+weighted on its own. The job outputs go to EOS. Memory and runtime are estimates (about 0.7 GB per
+selection plus ROOT): submit the signal first, it is 6 small jobs, and read `MemoryUsage` and
+`RemoteWallClockTime` before the large submissions.
+
+```bash
+source env.sh
+voms-proxy-init -voms cms -valid 192:00               # if less than ~3 days are left
+xrdfs root://cmseos.fnal.gov ls /store/user/$USER     # EOS reachable
+OUT='root://cmseos.fnal.gov//store/user/$USER/hscp/'
+
+# signal: Gluino 1600 (6 jobs)
+python3 condor/submit.py --samples Gluino_Run3_MET_madgraph_1600 --tag gluino1600_v1 \
+        --files-per-job 2 --selections-per-job 2 --memory '3 GB' --runtime 7200 --out-dir "$OUT" --submit
+
+# background: QCD (12 bins), TTbar2024, TTbarSemiLep2024, WjetMuNu2024 (about 4,500 jobs)
+python3 condor/submit.py \
+        --dataset QCD2024 --dataset TTbar2024 --dataset TTbarSemiLep2024 --dataset WjetMuNu2024 \
+        --tag bkg_v1 --files-per-job 20 --selections-per-job 2 --memory '3 GB' --runtime 7200 \
+        --out-dir "$OUT" --submit
+
+# data: JetMET2024C (about 300 jobs)
+python3 condor/submit.py --samples JetMET2024C --tag jetmetC_v1 \
+        --files-per-job 20 --selections-per-job 2 --memory '3 GB' --runtime 7200 --out-dir "$OUT" --submit
+```
+
+`Wjets2024_*` is left out: no cross-section, and its ntuples have the old layout.
+Without `--submit`, check `condor/work/<tag>/hscp.sub` first, then `condor_submit` it.
+
+Follow, resubmit and merge:
+
+```bash
+condor_q
+condor_q -hold -af HoldReason                         # exit 4: copy to EOS failed; 3: processing failed
+condor_history -limit 5 -af MemoryUsage RemoteWallClockTime
+for t in gluino1600_v1 bkg_v1 jetmetC_v1; do python3 condor/merge.py condor/work/$t --check; done
+cd condor/work/bkg_v1 && cp resubmit.txt jobs.txt && condor_submit hscp.sub && cd ../../..   # per tag with missing jobs
+for t in gluino1600_v1 bkg_v1 jetmetC_v1; do python3 condor/merge.py condor/work/$t; done
+```
+
+Weight the simulation with the luminosity of era C (`--lumi`, pb^-1), not the full-year
+`luminosity` of `cfg/datasets.json`:
+
+```bash
+L=<luminosity of era C in pb^-1>
+M=condor/work/bkg_v1/merged
+python3 python/Weight.py --dataset QCD2024 --input-dir $M --lumi $L --dry-run       # factors smooth across the bins?
+for d in QCD2024 TTbar2024 TTbarSemiLep2024 WjetMuNu2024; do
+    python3 python/Weight.py --dataset $d --input-dir $M --lumi $L -o output/bkg/${d}_weighted.root
+done
+python3 python/Weight.py --samples Gluino_Run3_MET_madgraph_1600 --input-dir condor/work/gluino1600_v1/merged \
+        --lumi $L -o output/signal/Gluino_1600_weighted.root
+```
+
+TTbar and WjetMuNu are NLO samples with negative weights: set their `sum_weights` in
+`cfg/datasets.json` before weighting (step 9). JetMET2024C needs no weighting:
+`condor/work/jetmetC_v1/merged/JetMET2024C.root` is used as it is.
+
+If `MemoryUsage` stays well below 3 GB, use `--selections-per-job 4` or 6 (with more `--memory`)
+for the next round: fewer jobs.
 
 ## Clean-up
 
 ```bash
-rm -rf condor/work/jetmet_v1       # chunks, generated selectors, logs and job outputs
+rm -rf condor/work/jetmet_v1       # chunks, generated selectors, logs and job outputs (if in out/)
+# job outputs on EOS (--out-dir), once merged:
+eos root://cmseos.fnal.gov rm -r /store/user/$USER/hscp/jetmet_v1     # the eos client of the LPC nodes
+eos rm -r /eos/user/${USER:0:1}/$USER/hscp/jetmet_v1                  # on LXPLUS
 rm -f macros/HSCPSelector_C*       # ACLiC products of an interactive run
 ```

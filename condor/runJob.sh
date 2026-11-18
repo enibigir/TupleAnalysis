@@ -1,12 +1,15 @@
 #!/bin/bash
 # HTCondor job: build libTools and the selector in the scratch directory, run macro.cc on one
-# chunk of files for one group of selections, leave the output file in the scratch directory.
+# chunk of files for one group of selections, leave the output file in the scratch directory,
+# or copy it to $HSCP_OUT_URL if set (condor/submit.py --out-dir with a URL).
 #
 # Arguments (written by condor/submit.py in jobs.txt):
 #   sample chunkList group outFile fillNosel ptcut etabins ihbins pbins massbins fpixbins
 #
 # Transferred inputs: env.sh compile.sh inc/ src/ macros/ (macro.cc + the generated selector
 # of the group) and the chunk list. Nothing is read from the repository checkout.
+#
+# Exit codes: 0 done, 4 the copy to $HSCP_OUT_URL failed, anything else from compile.sh or root.
 set -euo pipefail
 
 SAMPLE=$1; CHUNK=$2; GROUP=$3; OUT=$4; NOSEL=$5
@@ -32,3 +35,24 @@ cd "$SCRATCH"
 # Fail loudly if nothing was written: Condor then keeps the job in the log as failed.
 test -s "$OUT_ABS"
 echo "[job] wrote $OUT ($(du -h "$OUT_ABS" | cut -f1)), $(date)"
+
+# Remote output: copy it with xrdcp (root://) or gfal-copy (other URLs), creating the directory,
+# retrying twice; a failed copy fails the job, which Condor then holds (on_exit_hold).
+if [ -n "${HSCP_OUT_URL:-}" ]; then
+    DEST="${HSCP_OUT_URL%/}/$OUT"
+    case "$DEST" in
+        root://*) COPY=(xrdcp --force --path --silent "$OUT_ABS" "$DEST") ;;
+        *)        COPY=(gfal-copy --force --parent --timeout 3600 "file://$OUT_ABS" "$DEST") ;;
+    esac
+    for attempt in 1 2 3; do
+        if "${COPY[@]}"; then
+            echo "[job] copied to $DEST, $(date)"
+            rm -f "$OUT_ABS"                 # nothing left for Condor to transfer
+            exit 0
+        fi
+        echo "[job] copy attempt $attempt to $DEST failed" >&2
+        [ "$attempt" -lt 3 ] && sleep 60
+    done
+    echo "[job] ERROR: could not copy $OUT to $DEST" >&2
+    exit 4
+fi

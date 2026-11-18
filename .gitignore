@@ -20,3 +20,10 @@ condor/work/
 
 # smoke-test working directory
 tests/work/
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# generated from macros/HSCPTemplate.{h,C} at every launch (python/hscp/selector.py)
+macros/HSCPSelector.h
+macros/HSCPSelector.C

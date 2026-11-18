@@ -100,15 +100,17 @@ void HSCPSelector::SlaveBegin(TTree *tree) {
     //-------------------------------------
     //create RegionMassPlot for all selection
     //-------------------------------------
-    vmrp_.assign(kNRegionSlices, std::vector<RegionMassPlot>());
+    intervals_ = regionIntervals(sliceIntervals_);
+    vmri_.assign(intervals_.size(), std::vector<RegionMassPlot>());
+    cout << "Regions: " << intervals_.size() << " Fpix intervals per selection, added into "
+         << kNRegionSlices << " slices at the end" << endl;
     for(unsigned int i=0; i<selLabels_.size();i++)
     {
         cout << "Initialisation of the regions for selection: " << selLabels_[i] << endl;
 
-        // one RegionMassPlot per (region, Fpix slice) of kRegionSlices, for this selection
-        for (size_t r = 0; r < kNRegionSlices; ++r)
-            vmrp_[r].emplace_back(std::string(kRegionSlices[r].suffix) + "_" + selLabels_[i],
-                                  etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
+        // one RegionMassPlot per Fpix interval, for this selection
+        for (size_t k = 0; k < intervals_.size(); ++k)
+            vmri_[k].emplace_back(intervalSuffix(k, selLabels_[i]), etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
 
         CPlots plots;
 
@@ -516,7 +518,15 @@ void HSCPSelector::SlaveBegin(TTree *tree) {
 }
 
 Bool_t HSCPSelector::Process(Long64_t entry) {
-    fReader.SetLocalEntry(entry);
+    // A branch that is missing from the ntuple, or stored with another type than its reader,
+    // leaves the readers unusable (ROOT prints which ones just above): stop the processing here,
+    // dereferencing them would crash. macro.cc turns the abort into a non-zero exit code.
+    if (fReader.SetLocalEntry(entry) != TTreeReader::kEntryValid) {
+        std::cerr << "HSCPSelector: cannot read entry " << entry << " (TTreeReader status " << fReader.GetEntryStatus()
+                  << "): the ntuple does not match the branches declared in HSCPSelector.h. Aborting." << std::endl;
+        Abort("ntuple incompatible with the selector", kAbortProcess);
+        return kFALSE;
+    }
 
     //Step 1: Calculate PFHT, PFMHT and PFMHTNoMu variables for the event
     //        with associated up/nominal/down variations
@@ -1563,15 +1573,18 @@ Bool_t HSCPSelector::Process(Long64_t entry) {
             double massForRegions = GetMass(Pt_pseudo[icand]*cosh(Eta[icand]), Ih_Strip[icand], K, C);
 
             if (trigger) {
-                // regions A and B take the candidates with pT <= ptcut, C and D those above it;
-                // a slice of kRegionSlices is filled when fpixLo < Fpix <= fpixHi
+                // regions A and B take the candidates with pT <= ptcut, C and D those above it. The
+                // candidate goes into the one Fpix interval holding it (fpixLo < Fpix <= fpixHi): the
+                // intervals of one side of the pT cut are disjoint. Terminate builds the slices from them.
                 const bool belowPtCut = Pt_pseudo[icand] <= ptcut_;
                 const bool abovePtCut = Pt_pseudo[icand] > ptcut_;
-                for (size_t r = 0; r < kNRegionSlices; ++r) {
-                    const RegionSlice& reg = kRegionSlices[r];
-                    if (!(reg.belowPtCut ? belowPtCut : abovePtCut)) continue;
-                    if (Fpix[icand] > reg.fpixLo && Fpix[icand] <= reg.fpixHi)
-                        vmrp_[r][s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
+                for (size_t k = 0; k < intervals_.size(); ++k) {
+                    const FpixInterval& in = intervals_[k];
+                    if (!(in.belowPtCut ? belowPtCut : abovePtCut)) continue;
+                    if (Fpix[icand] > in.fpixLo && Fpix[icand] <= in.fpixHi) {
+                        vmri_[k][s].fill(Eta[icand], NOM_noL1[icand], overP, Pt_pseudo[icand], Pterr[icand], Ih_Strip[icand], GStrip[icand], massForRegions, *PV_npvsGood, Fpix[icand], newWeight);
+                        break;
+                    }
                 }
 
                 if (abovePtCut && !isSignal && Fpix[icand] > kFpix8 && massForRegions >= 1500) {
@@ -1931,8 +1944,7 @@ void HSCPSelector::SlaveTerminate() {
     if (fillNosel_) for(auto obj: vcp_nosel) obj.AddToList(fOutput);
     else std::cout << "No-selection histograms not written (fillNosel = 0)" << std::endl;
 
-    for (auto& slice : vmrp_) for (auto& obj : slice) obj.addToList(fOutput);
-
+    // the region histograms are written by Terminate (writeRegionSlices), one slice at a time
 }
 
 void HSCPSelector::Terminate() {
@@ -1948,7 +1960,41 @@ void HSCPSelector::Terminate() {
         const_cast<TObject*>(object)->Write();
     }
 
+    writeRegionSlices(fout);
+
     //write and close the output file
     const_cast<TFile*>(fout)->Write();
     fout->Close();
+}
+
+
+// Writes the slices of kRegionSlices, each the sum of its Fpix intervals, as they were written when they
+// were filled directly: RegionMassPlot::addToList, so the names (<quantity><suffix>_<selection label>),
+// the projections and the profiles are the same. One slice is built at a time and deleted once written,
+// so writing needs little memory on top of the intervals.
+void HSCPSelector::writeRegionSlices(TFile* out) {
+    out->cd();
+    size_t written = 0;
+    for (size_t s = 0; s < selLabels_.size(); ++s) {
+        for (size_t r = 0; r < kNRegionSlices; ++r) {
+            if (sliceIntervals_[r].empty()) continue;
+            RegionMassPlot slice(std::string(kRegionSlices[r].suffix) + "_" + selLabels_[s],
+                                 etabins_, ihbins_, pbins_, massbins_, fpixbins_, C);
+            for (size_t k : sliceIntervals_[r]) slice.addFrom(vmri_[k][s]);
+
+            TList objects;                      // empty for the selections whose regions are not exported
+            slice.addToList(&objects);
+            for (TObject* o : objects) {
+                out->WriteTObject(o, o->GetName());
+                ++written;
+            }
+            // RegionMassPlot owns nothing: delete the histograms and the projections addToList made
+            const std::vector<TH1*> own = slice.histograms();
+            for (TObject* o : objects)
+                if (std::find(own.begin(), own.end(), o) == own.end()) delete o;
+            for (TH1* h : own) delete h;
+        }
+    }
+    std::cout << written << " region objects written (" << kNRegionSlices << " slices built from "
+              << intervals_.size() << " Fpix intervals)" << std::endl;
 }

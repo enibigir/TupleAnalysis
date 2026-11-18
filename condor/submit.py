@@ -9,19 +9,34 @@ so nothing is shared between jobs and the worker only needs ROOT (see env.sh).
     python3 condor/submit.py --samples 'JetMET2024*' --tag jetmet                  # prepare only
     python3 condor/submit.py --dataset JetMET2024 --tag jetmet --submit             # same samples, and condor_submit
     python3 condor/submit.py --samples TestMET2024,TestMuon2024 --files-per-job 5 --selections-per-job 12
+    python3 condor/submit.py --samples QCD2024_mu_pt80to120 --tag qcd --proxy ~/x509up             # explicit proxy file
+    python3 condor/submit.py --dataset QCD2024 --tag qcd --out-dir 'root://cmseos.fnal.gov//store/user/$USER/hscp/'
 
 Samples, their ntuples and their binning come from cfg/datasets.json: names are matched
 (fnmatch) with --samples, or every sample of a dataset taken with --dataset. The production
 directory is --prod-dir, else $HSCP_PROD_DIR, else the prod_dir of the file.
+
+Grid proxy (--proxy): with 'auto' (the default), if an input file is on remote storage (davs://,
+root://, ...), the proxy of $X509_USER_PROXY, else /tmp/x509up_u<uid>, is given to the jobs through
+x509userproxy in hscp.sub. It must exist and live longer than --runtime + 1 h (checked with
+voms-proxy-info when available). '--proxy none' gives no proxy; '--proxy PATH' gives that file.
 
 Everything is written under condor/work/<tag>/:
     chunks/        one file list per chunk
     sel/g<k>/      selection file and generated selector of group k (macros/HSCPSelector.{h,C})
     jobs.txt       one line per job (the queue of hscp.sub)
     hscp.sub       the submit file
-    out/           job outputs (after running)
+    out/           job outputs (after running), unless --out-dir is given
+    output_dir.txt where the job outputs go, read by merge.py
     log/           Condor logs
 Afterwards: python3 condor/merge.py condor/work/<tag>
+
+Job outputs (--out-dir): by default condor/work/<tag>/out/. With --out-dir D they go to D/<tag>/:
+  - D a local directory: Condor transfers each output there (the submit machine must see it);
+  - D a URL (root://, davs://, ...): each job copies its output itself at the end, with xrdcp for
+    root:// and gfal-copy otherwise, and nothing is transferred back but the logs. The job fails
+    (and is held) if the copy fails. The jobs then need the grid proxy, which --proxy auto gives them.
+$USER and other variables in D are expanded (quote D so that the shell leaves them alone, or not).
 """
 
 import argparse
@@ -31,7 +46,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
-from hscp import config, driver, selector  # noqa: E402
+from hscp import config, driver, proxy, selector, storage  # noqa: E402
 
 REPO = config.REPO
 
@@ -50,13 +65,17 @@ def main():
     ap.add_argument("--tag", required=True, help="name of the working directory condor/work/<tag>")
     ap.add_argument("--files-per-job", type=int, default=20)
     ap.add_argument("--selections-per-job", type=int, default=2,
-                    help="selections per job; memory is about 1.7 GB per selection at the default binning")
+                    help="selections per job; memory is about 0.7 GB per selection at the default binning")
     ap.add_argument("--selections", default=config.SELECTIONS_FILE)
     ap.add_argument("--prod-dir", help="production directory (default: $HSCP_PROD_DIR, else prod_dir of datasets.json)")
     ap.add_argument("--memory", default="4 GB", help="request_memory")
     ap.add_argument("--cpus", type=int, default=1, help="request_cpus, also HSCP_NTHREADS in the job")
     ap.add_argument("--runtime", type=int, default=7200, help="+MaxRuntime in seconds")
     ap.add_argument("--requirements", default="", help="extra Condor requirements expression")
+    ap.add_argument("--proxy", default="auto", metavar="auto|none|PATH",
+                    help="grid proxy given to the jobs (default: auto, i.e. only if an input file is remote)")
+    ap.add_argument("--out-dir", metavar="DIR|URL",
+                    help="where the job outputs go, in <DIR|URL>/<tag>/ (default: condor/work/<tag>/out/)")
     ap.add_argument("--submit", action="store_true", help="run condor_submit at the end")
     args = ap.parse_args()
     patterns = [p.strip() for p in args.samples.split(",") if p.strip()]
@@ -66,8 +85,15 @@ def main():
     work = os.path.join(REPO, "condor", "work", args.tag)
     if os.path.exists(os.path.join(work, "jobs.txt")):
         sys.exit(f"{work} already holds jobs.txt: choose another --tag or remove the directory")
-    for d in ("chunks", "sel", "out", "log"):
+    try:
+        location = storage.resolve(args.out_dir, args.tag) if args.out_dir else os.path.join(work, storage.DEFAULT_SUBDIR)
+    except storage.StorageError as e:
+        sys.exit(f"submit: {e}")
+    remote_out = storage.is_url(location)
+    for d in ("chunks", "sel", "log"):
         os.makedirs(os.path.join(work, d), exist_ok=True)
+    if not remote_out:
+        os.makedirs(location, exist_ok=True)
 
     # ---- samples ----
     try:
@@ -90,13 +116,14 @@ def main():
     print(f"{len(sels)} selections in {len(groups)} group(s) of up to {args.selections_per_job}")
 
     # ---- chunks and job list ----
-    jobs = []
+    jobs, all_files = [], []
     for name in selected:
         binning = cfg.binning(name)
         try:
             files = cfg.files(name)
         except config.ConfigError as e:
             sys.exit(f"submit: {e}")
+        all_files += files
         chunks = list(config.chunked(files, args.files_per_job))
         for c, chunk in enumerate(chunks):
             chunk_path = os.path.join(work, "chunks", f"{name}_c{c}.txt")
@@ -109,23 +136,43 @@ def main():
                 jobs.append(f"{name} {chunk_path} {g} {out} {nosel} {b} {c}")
         print(f"{name:<32} {len(files):5d} files -> {len(chunks)} chunk(s) x {len(groups)} group(s)")
 
+    # ---- grid proxy: checked before jobs.txt is written, so the same --tag can be used again ----
+    try:
+        # the jobs need the proxy to read remote inputs, and to write a remote output
+        proxy_path, proxy_left = proxy.resolve(args.proxy, all_files + [location], args.runtime)
+    except proxy.ProxyError as e:
+        sys.exit(f"submit: {e}")
+
     with open(os.path.join(work, "jobs.txt"), "w") as f:
         f.write("\n".join(jobs) + "\n")
+    with open(os.path.join(work, storage.LOCATION_FILE), "w") as f:
+        f.write(location + "\n")
+    try:
+        already = storage.listing(location)
+        if already:
+            print(f"warning: {location} already holds {len(already)} file(s); merge.py would use those with the job names")
+    except storage.StorageError as e:
+        print(f"warning: cannot list {location} from here ({str(e).splitlines()[0]})")
 
     # ---- submit file ----
     req = f"requirements = {args.requirements}\n" if args.requirements else ""
+    if remote_out:      # runJob.sh copies the output to $HSCP_OUT_URL; Condor brings back the logs only
+        env = f"HSCP_NTHREADS={args.cpus} HSCP_OUT_URL={location}"
+        transfer_out = 'transfer_output_files = ""'
+    else:
+        env = f"HSCP_NTHREADS={args.cpus}"
+        transfer_out = f'transfer_output_files = $(out)\ntransfer_output_remaps = "$(out) = {location}/$(out)"'
     sub = f"""# generated by condor/submit.py; queue read from jobs.txt
 universe              = vanilla
 executable            = {REPO}/condor/runJob.sh
 initialdir            = {work}
 arguments             = $(sample) $(chunk) $(group) $(out) $(nosel) $(ptcut) $(etabins) $(ihbins) $(pbins) $(massbins) $(fpixbins)
-environment           = "HSCP_NTHREADS={args.cpus}"
+environment           = "{env}"
 
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
 transfer_input_files  = {REPO}/env.sh, {REPO}/compile.sh, {REPO}/inc, {REPO}/src, {work}/sel/g$(group)/macros, $(chunk)
-transfer_output_files = $(out)
-transfer_output_remaps = "$(out) = out/$(out)"
+{transfer_out}
 
 output                = log/$(sample)_g$(group)_c$(chunkid).out
 error                 = log/$(sample)_g$(group)_c$(chunkid).err
@@ -136,7 +183,7 @@ request_memory        = {args.memory}
 +MaxRuntime           = {args.runtime}
 max_retries           = 2
 on_exit_hold          = (ExitCode != 0)
-{req}
+{proxy.sub_line(proxy_path)}{req}
 queue sample, chunk, group, out, nosel, ptcut, etabins, ihbins, pbins, massbins, fpixbins, chunkid from jobs.txt
 """
     sub_path = os.path.join(work, "hscp.sub")
@@ -145,6 +192,8 @@ queue sample, chunk, group, out, nosel, ptcut, etabins, ihbins, pbins, massbins,
 
     print(f"\n{len(jobs)} jobs prepared in {work}")
     print(f"submit file: {sub_path}")
+    print(f"outputs:     {location}" + ("  (copied by the jobs)" if remote_out else ""))
+    print(f"proxy:       {proxy.describe(proxy_path, proxy_left)}")
     if args.submit:
         subprocess.run(["condor_submit", sub_path], check=True, cwd=work)
     else:

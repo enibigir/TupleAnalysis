@@ -27,7 +27,7 @@ macros/macro.cc
               └─ #include "../inc/ComputeATLASmass.h"
 ```
 
-`HSCPSelector.{h,C}` are generated from `HSCPTemplate.{h,C}` by `python/CreateSelector.py`. The selector is the only consumer of the library. It does not include `MassTools.h` directly: `GetMass`, `loadSF1D` and `loadSF2D` reach it through `RegionMassPlot.h`, which is why that include must stay.
+`HSCPSelector.{h,C}` are generated from `HSCPTemplate.{h,C}` at every launch (or by `python/CreateSelector.py`) and are not kept in git. The selector is the only consumer of the library. It does not include `MassTools.h` directly: `GetMass`, `loadSF1D` and `loadSF2D` reach it through `RegionMassPlot.h`, which is why that include must stay.
 
 ### Build
 
@@ -117,7 +117,9 @@ Both are empty. The histograms are created with `new` and never deleted by `CPlo
 
 ## `RegionMassPlot` — `inc/RegionMassPlot.h`, `src/RegionMassPlot.cc`
 
-A fixed set of 26 control histograms for one region of the background estimate. The selector builds 49 of them per selection, one for each of the regions A, B, C, D in each of their Fpix slices.
+A fixed set of 26 control histograms for one region of the background estimate. The selector fills one per disjoint Fpix interval and side of the pT cut (18 per selection), and when it writes the output it builds one per slice of `kRegionSlices` (49 per selection, regions A, B, C, D in each of their Fpix slices) as the sum of its intervals, with `addFrom`, exports it with `addToList` and deletes it.
+
+`histograms()` returns the 26 histograms in a fixed order, without the projections and profiles that `addToList` adds. `addFrom(other)` adds the histograms of a plot with the same binning, histogram by histogram.
 
 All histogram names end with the `suffix` given to the constructor, which the selector builds as `_region<A|B|C|D>_<lo>fp<hi>_<selection label>`, for example `ih_eta_regionD_8fp9_METanalysis_TestPUppiMETCut_Eta2p4`.
 

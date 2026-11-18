@@ -6,6 +6,7 @@
 #include <TH2F.h>
 #include <TList.h>
 #include <string>
+#include <vector>
 
 // Not needed by this class: HSCPSelector.h gets GetMass and loadSF1D/2D through this include.
 #include "MassTools.h"
@@ -20,6 +21,10 @@ class RegionMassPlot{
         void initHisto(int& etabins,int& ihbins,int& pbins,int& massbins,int& fpixbins, float& C_parameter);
         void fill(float eta, float nhits, float p, float pt, float pterr, float ih, float ias, float m, float npv, float fpix, float w);
         void addToList(TList* list);	
+        // The 26 histograms, in a fixed order (not the projections that addToList adds).
+        std::vector<TH1*> histograms() const;
+        // Adds the histograms of another plot with the same binning, histogram by histogram.
+        void addFrom(const RegionMassPlot& other);
 
 	//Data members
 	std::string suffix_;
