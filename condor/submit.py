@@ -195,7 +195,12 @@ queue sample, chunk, group, out, nosel, ptcut, etabins, ihbins, pbins, massbins,
     print(f"outputs:     {location}" + ("  (copied by the jobs)" if remote_out else ""))
     print(f"proxy:       {proxy.describe(proxy_path, proxy_left)}")
     if args.submit:
-        subprocess.run(["condor_submit", sub_path], check=True, cwd=work)
+        # through bash, as from a terminal: the condor_submit of some sites (FNAL LPC) is a wrapper
+        # script without a #! line, which a direct exec refuses (OSError: Exec format error)
+        r = subprocess.run(["bash", "-c", 'condor_submit "$1"', "condor_submit", sub_path], cwd=work)
+        if r.returncode != 0:
+            sys.exit(f"submit: condor_submit failed (exit code {r.returncode}); the jobs are prepared in {work}, "
+                     f"submit them with: cd {work} && condor_submit hscp.sub")
     else:
         print(f"to submit:   condor_submit {sub_path}")
 
