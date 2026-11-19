@@ -8,7 +8,7 @@ so nothing is shared between jobs and the worker only needs ROOT (see env.sh).
 
     python3 condor/submit.py --samples 'JetMET2024*' --tag jetmet                  # prepare only
     python3 condor/submit.py --dataset JetMET2024 --tag jetmet --submit             # same samples, and condor_submit
-    python3 condor/submit.py --samples TestMET2024,TestMuon2024 --files-per-job 5 --selections-per-job 12
+    python3 condor/submit.py --samples TestJetMET2024C,TestGluino_Run3_MET_madgraph_1600 --files-per-job 5 --selections-per-job 12
     python3 condor/submit.py --samples QCD2024_mu_pt80to120 --tag qcd --proxy ~/x509up             # explicit proxy file
     python3 condor/submit.py --dataset QCD2024 --tag qcd --out-dir 'root://cmseos.fnal.gov//store/user/$USER/hscp/'
 
@@ -63,7 +63,7 @@ def _mk(d):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--samples", default="",
-                    help="comma-separated sample names or fnmatch patterns, e.g. 'JetMET2024*,Mu2024C'")
+                    help="comma-separated sample names or fnmatch patterns, e.g. 'JetMET2024*,TTbar2024'")
     ap.add_argument("--dataset", action="append", default=[], metavar="NAME", help="all samples of a dataset (repeatable)")
     ap.add_argument("--tag", required=True, help="name of the working directory condor/work/<tag>")
     ap.add_argument("--files-per-job", type=int, default=20)

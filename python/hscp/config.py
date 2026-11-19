@@ -6,11 +6,11 @@ cfg/datasets.json: the samples of the analysis, where their ntuples are, and the
       "binning":  {"ptcut": 70, "etabins": 96, "ihbins": 400, "pbins": 1000, "massbins": 400, "fpixbins": 20},
       "luminosity": 1000,                       (pb^-1, optional: used by python/Weight.py)
       "samples": {
-        "JetMET2024C": {"list": "JetMET2024/V12p310.txt", "type": "data", "dataset": "JetMET2024"},
-        "Stop_Run3_MET_madgraph_700": {"file": "SIGNAL/V21p0/HSCP-Stop_Par-M-700_merged.root",
-                                       "type": "signal", "dataset": "Stop", "mass": 700,
-                                       "binning": {"etabins": 48}},
-        "QCD2024_mu_pt80to120": {"list": "input/QCD_Bin-PT-80to120_CodeV16p2.txt", "type": "mc",
+        "JetMET2024C": {"list": "input/JetMET2024C.txt", "type": "data", "dataset": "JetMET2024"},
+        "Gluino_Run3_MET_madgraph_1600": {"list": "input/HSCP-Gluino_Par-M-1600.txt", "type": "signal",
+                                          "dataset": "Gluino_madgraph", "mass": 1600, "xsec": 0.01282,
+                                          "binning": {"etabins": 48}},
+        "QCD2024_mu_pt80to120": {"list": "input/QCD_Bin-PT-80to120.txt", "type": "mc",
                                  "dataset": "QCD2024", "xsec": 1234.5}
       }
     }

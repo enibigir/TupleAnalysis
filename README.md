@@ -29,7 +29,7 @@ source env.sh                # ROOT in the PATH, or the LCG view from CVMFS
 ./compile.sh                 # builds libTools.so from src/ and inc/
 ./tests/run_smoke.sh         # optional: whole chain on a synthetic ntuple, a few minutes
 ./launch.sh --list '*'       # the samples known to cfg/datasets.json
-./launch.sh TestMET2024      # generates and compiles the selector, runs it on that sample
+./launch.sh TestJetMET2024C  # generates and compiles the selector, runs it on that sample
 ```
 
 The result is `output/<sample>.root`, with the log next to it.
@@ -87,10 +87,10 @@ One JSON file, read by `launch.sh` and `condor/submit.py` only (`macro.cc` recei
 | `binning` | default pT cut (`ptcut`, separating regions A, B from C, D) and bin counts `etabins`, `ihbins`, `pbins`, `massbins`, `fpixbins` of the region histograms |
 | `samples` | one entry per sample name, see below |
 
-A **sample** is one entry, for example `JetMET2024C`; a **dataset** is the group of samples it belongs to, for example `JetMET2024` for the eras C to I, or `Stop` for the mass points. Each sample has exactly one of `list` (a text file with one ROOT file per line) or `file` (a single ROOT file), relative to `prod_dir` unless absolute or a `root://` URL; a `type` among `data`, `mc` and `signal`; its `dataset`, used by `--dataset`; optionally `mass` (GeV, informative) and a `binning` object overriding any of the default keys.
+A **sample** is one entry, for example `JetMET2024C`; a **dataset** is the group of samples it belongs to, for example `JetMET2024` for the eras C to I, or `Gluino_madgraph` for the mass points. Each sample has exactly one of `list` (a text file with one ROOT file per line) or `file` (a single ROOT file), relative to `prod_dir` unless absolute or a `root://` URL; a `type` among `data`, `mc` and `signal`; its `dataset`, used by `--dataset`; optionally `mass` (GeV, informative) and a `binning` object overriding any of the default keys.
 
 ```json
-"Stop_Run3_MET_madgraph_700": {"file": "SIGNAL/V21p0/HSCP-Stop_Par-M-700_merged.root", "type": "signal", "dataset": "Stop", "mass": 700}
+"Gluino_Run3_MET_madgraph_1600": {"list": "input/HSCP-Gluino_Par-M-1600.txt", "type": "signal", "dataset": "Gluino_madgraph", "mass": 1600, "xsec": 0.01282}
 ```
 
 The binning drives the memory used: with 96 η, 400 Ih, 1000 p, 400 mass and 20 Fpix bins, the region histograms take about 0.7 GB **per selection**. They are filled in 18 disjoint Fpix intervals per selection and added into the 49 slices of the output when it is written (`regionIntervals` and `writeRegionSlices` in `macros/HSCPTemplate.{h,C}`); a slice added to `kRegionSlices` gets its intervals automatically.
@@ -119,27 +119,25 @@ The samples of `cfg/datasets.json`, by dataset:
 
 | Sample name | Ntuples |
 |---|---|
-| `JetMET2024C` … `JetMET2024I` | file lists `JetMET2024/V12p310.txt` … `V12p316.txt` |
-| `Mu2024C` … `Mu2024I` | file lists `Mu2024/V18p100.txt` … `V18p106.txt` |
-| `MuonEG2024C` … `MuonEG2024I` | file lists `MuonEG2024/V17p40.txt` … `V17p46.txt` |
-| `QCD2024_mu_pt15to20` … `QCD2024_mu_pt1000` | file lists `BKG/QCD2024/V16p21.txt` … `V16p212.txt` |
-| `Wjets2024_1J_pt40to100` … `Wjets2024_2J_pt600` | file lists `BKG/Wjets2024/V14p601.txt` … `V14p6010.txt` |
-| `WjetMuNu2024`, `TTbar2024`, `TTbarSemiLep2024` | one file list each |
-| `Gluino_Run3_MET_pythia_<mass>` | one ROOT file per mass (`CodeV19p0` production) |
-| `Gluino_Run3_MET_madgraph_<mass>` | one ROOT file per mass (`V19p6` production) |
-| `Gluino_Run2_MET_madgraph_2000` | one ROOT file |
-| `Stau_Run3_MET_<mass>`, `Stop_Run3_MET_madgraph_<mass>` | one ROOT file per mass |
-| `TestMET2024`, `TestMuon2024`, `TestMuonEG`, `TestTTbar2024`, `TestWjets`, `TestWjetsMuNu` | short file lists, for tests |
+| `JetMET2024C` | file list `input/JetMET2024C.txt` |
+| `QCD2024_mu_pt15to20` … `QCD2024_mu_pt1000` | file lists `input/QCD_Bin-PT-15to20.txt` … `QCD_Bin-PT-1000.txt` |
+| `WjetMuNu2024`, `TTbar2024`, `TTbarSemiLep2024` | file lists `input/WtoMuNu-2Jets.txt`, `TTto2L2Nu.txt`, `TTtoLNu2Q.txt` |
+| `Gluino_Run3_MET_madgraph_<mass>` (1100 … 2600) | file lists `input/HSCP-Gluino_Par-M-<mass>.txt` (`V19p6` production) |
+| `TestJetMET2024C`, `TestGluino_Run3_MET_madgraph_1600` | 2-file lists, for tests |
+
+Every simulated sample has its cross-section (`xsec`, pb). Samples without one (pythia and Run 2
+gluinos, Stau, Stop, `Wjets2024_*`) were removed, as were the data eras whose file lists are not in
+`input/` (JetMET2024D–I, Mu2024, MuonEG2024); their entries are in `backup/datasets.json`.
 
 A file list is a text file with one ROOT file per line.
 
 ## Running
 
 ```bash
-./launch.sh 'JetMET2024*'                        # every era of the data stream
-./launch.sh --dataset QCD2024 --dataset Wjets2024 --jobs 3   # three samples at a time, one thread each
+./launch.sh 'JetMET2024*'                        # every era of the data stream (C only for now)
+./launch.sh --dataset QCD2024 --dataset TTbar2024 --jobs 3   # three samples at a time, one thread each
 ./launch.sh 'Gluino_Run3_MET_madgraph_*' --out-dir output/Gluino_V20 --label V20
-./launch.sh TestMET2024 --dry-run                # print the root commands only
+./launch.sh TestJetMET2024C --dry-run            # print the root commands only
 ./launch.sh --list '*'                           # names and binning
 ```
 
@@ -199,6 +197,28 @@ The selector reads three tables in `inc/` at start-up and stops if one is missin
 The script reads the data and simulation files named at the top of its `CONFIG` block, produced with a selection labelled `TriggerEffCalib`. It also writes the LaTeX version of the tables and the maps of the two-dimensional scale factors in `outputDisplay/TriggEff/`.
 
 The format of the tables is described in [`doc/src_inc.md`](doc/src_inc.md).
+
+## Background prediction (submodule)
+
+The data-driven background prediction of the mass spectrum, its systematic uncertainties and the
+final mass-spectrum plots are in the submodule
+[`massSpectrum_bckgPrediction/`](https://github.com/glcln/massSpectrum_bckgPrediction), a separate
+repository. It reads the per-sample outputs of this one: the region histograms
+`eta_1oP_`, `ih_eta_`, `mass_`, `mass_eta_` + `region<A|B|C|D>_<3fp8|8fp9|3fp9|9fp10>_METanalysis_TestPUppiMETCut[_SigmaPtoverPt_0p5][_EoP_0p1]_<eta>`,
+which every output of `launch.sh` and `condor/merge.py` contains.
+
+```bash
+git submodule update --init           # after a fresh clone (or: git clone --recurse-submodules ...)
+git submodule update --remote         # move it to the latest commit of its main branch
+```
+
+Its steps: the ABCD prediction in the validation and search regions (`LaunchBkgPred.py`, which runs
+`BkgPrediction.C`), the systematics of the background (`systBckg.py`) and of the signal
+(`systSignal.py`), then the plots (`ShowPlots.py`). See its README. Its paths (`outputDir`,
+`datasetList`, `BASE`, ...) are set at the top of each script. Its `RescaleBKG.py` and
+`RescaleSignal.py` do the job of `python/Weight.py` here, with their own cross-section tables; the
+`*_weighted.root` names they read follow the `<sample>_V<version>_weighted.root` pattern. It does
+not set limits: no datacards, no Combine.
 
 ## Site-specific paths
 

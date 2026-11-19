@@ -23,9 +23,8 @@ python3 -m unittest discover -s tests -v
 ## 2. Site configuration
 
 ```bash
-export HSCP_PROD_DIR=/scratch/ui3_1/gcoulon/HSCP_prod/    # directory holding the ntuples and their file lists
-ls $HSCP_PROD_DIR/JetMET2024/V12p310.txt                  # one file list per dataset, see cfg/datasets.json
-head -3 $HSCP_PROD_DIR/JetMET2024/V12p310.txt             # the ROOT files must be readable from the worker nodes
+ls input/                          # one file list per sample, see cfg/datasets.json ("prod_dir": "" = the checkout)
+head -3 input/JetMET2024C.txt      # the ROOT files must be readable from the worker nodes
 ```
 
 If the ntuples are on storage that the worker nodes cannot mount, the file lists must hold
@@ -50,8 +49,8 @@ cat cfg/selections.json            # the cuts and the selections; memory is abou
 ## 4. Interactive test on one small dataset
 
 ```bash
-./launch.sh TestMET2024 --dry-run                     # shows the root commands
-./launch.sh TestMET2024 --out-dir output/test         # output/test/TestMET2024.root and .log
+./launch.sh TestJetMET2024C --dry-run                     # shows the root commands
+./launch.sh TestJetMET2024C --out-dir output/test         # output/test/TestJetMET2024C.root and .log
 ```
 
 The same thing by hand, which is what the launcher and the Condor jobs run:
@@ -59,7 +58,7 @@ The same thing by hand, which is what the launcher and the Condor jobs run:
 ```bash
 python3 python/CreateSelector.py
 cd macros
-root -l -b -q 'macro.cc("TestMET2024","../output/test/TestMET2024.files","TestMET2024.root",true,70,96,400,1000,400,20)'
+root -l -b -q 'macro.cc("TestJetMET2024C","../output/test/TestJetMET2024C.files","TestJetMET2024C.root",true,70,96,400,1000,400,20)'
 cd ..
 ```
 
@@ -75,9 +74,9 @@ group of selections, `jobs.txt` and `hscp.sub`. Useful variants:
 
 ```bash
 python3 condor/submit.py --dataset Gluino_madgraph --tag gluino_v1 --selections-per-job 12
-python3 condor/submit.py --samples Mu2024C,Mu2024D --tag mu_CD
+python3 condor/submit.py --samples QCD2024_mu_pt80to120,QCD2024_mu_pt120to170 --tag qcd_80to170
 python3 condor/submit.py --dataset QCD2024 --tag qcd --cpus 4 --memory '6 GB'      # 4 implicit-MT threads
-python3 condor/submit.py --samples TestMET2024 --tag t1 --requirements '(OpSysAndVer == "AlmaLinux9")'
+python3 condor/submit.py --samples TestJetMET2024C --tag t1 --requirements '(OpSysAndVer == "AlmaLinux9")'
 ```
 
 Grid proxy: by default (`--proxy auto`), if an input file is remote, `submit.py` writes
@@ -261,6 +260,27 @@ Profiles (`*_pfx`) are added with the factors as weights, so their mean values a
 file is written as `<output>.part` and renamed at the end, and histograms are processed one name
 at a time: memory stays small (about 0.6 GB for 20,000 histograms).
 
+### Several outputs in parallel
+
+Each call takes about a minute whatever the size of its samples, because it writes every
+histogram. Independent outputs can run at the same time, one process each (about 0.6 GB of memory
+each). On the three test samples, the weighting took 74 s instead of 170 s, one after the other:
+
+```bash
+D=output/testchain
+python3 python/Weight.py --samples TestQCD2024_mu_pt80to120 --input-dir $D -o $D/weighted/TestQCD2024_weighted.root -f > $D/weighted/TestQCD2024_weighted.log 2>&1 & p1=$!
+python3 python/Weight.py --samples TestGluino_Run3_MET_madgraph_1600 --input-dir $D -o $D/weighted/TestGluino_1600_weighted.root -f > $D/weighted/TestGluino_1600_weighted.log 2>&1 & p2=$!
+python3 python/Weight.py --samples TestJetMET2024C --input-dir $D -o $D/weighted/TestJetMET2024C.root -f > $D/weighted/TestJetMET2024C.log 2>&1 & p3=$!
+wait $p1; e1=$?; wait $p2; e2=$?; wait $p3; e3=$?
+echo "exit codes $e1 $e2 $e3"                    # 0 0 0
+tail -qn1 $D/weighted/*.log                      # each: "20268 histograms written to ..."
+```
+
+Run the dry runs first, one after the other: they are quick and print the factors to check. Give
+each process its own log, otherwise their outputs mix. Wait on the process IDs as above: `wait`
+alone, or a loop over `jobs -p`, can return before the jobs end in some shells (zsh), and loses
+their exit codes.
+
 ## 10. Hand the results to the plotting macros
 
 `CombineHistos.C` reads fixed paths such as `../output/QCD2024_V16/QCD2024_mu_V16p2_weighted.root`:
@@ -309,7 +329,7 @@ python3 condor/submit.py --samples JetMET2024C --tag jetmetC_v1 \
         --files-per-job 20 --selections-per-job 2 --memory '3 GB' --runtime 7200 --out-dir "$OUT" --submit
 ```
 
-`Wjets2024_*` is left out: no cross-section, and its ntuples have the old layout.
+These are all the simulated samples of `cfg/datasets.json`: those without a cross-section were removed.
 Without `--submit`, check `condor/work/<tag>/hscp.sub` first, then `condor_submit` it.
 
 Follow, resubmit and merge:
@@ -330,11 +350,19 @@ Weight the simulation with the luminosity of era C (`--lumi`, pb^-1), not the fu
 L=<luminosity of era C in pb^-1>
 M=condor/work/bkg_v1/merged
 python3 python/Weight.py --dataset QCD2024 --input-dir $M --lumi $L --dry-run       # factors smooth across the bins?
-for d in QCD2024 TTbar2024 TTbarSemiLep2024 WjetMuNu2024; do
-    python3 python/Weight.py --dataset $d --input-dir $M --lumi $L -o output/bkg/${d}_weighted.root
+mkdir -p output/bkg output/signal
+pids=() names=()
+for d in QCD2024 TTbar2024 TTbarSemiLep2024 WjetMuNu2024; do       # the 5 outputs in parallel
+    python3 python/Weight.py --dataset $d --input-dir $M --lumi $L -o output/bkg/${d}_weighted.root \
+            > output/bkg/${d}_weighted.log 2>&1 &
+    pids+=($!) names+=($d)
 done
 python3 python/Weight.py --samples Gluino_Run3_MET_madgraph_1600 --input-dir condor/work/gluino1600_v1/merged \
-        --lumi $L -o output/signal/Gluino_1600_weighted.root
+        --lumi $L -o output/signal/Gluino_1600_weighted.root > output/signal/Gluino_1600_weighted.log 2>&1 &
+pids+=($!) names+=(Gluino_1600)
+for i in "${!pids[@]}"; do
+    wait "${pids[$i]}" && echo "ok    ${names[$i]}" || echo "FAIL  ${names[$i]} (see its .log)"
+done
 ```
 
 TTbar and WjetMuNu are NLO samples with negative weights: set their `sum_weights` in

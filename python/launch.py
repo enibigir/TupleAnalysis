@@ -2,11 +2,11 @@
 """
 Run the selector on samples, locally.
 
-    ./launch.sh 'JetMET2024*' Mu2024C              # every era of JetMET2024, then Mu2024C
-    ./launch.sh --dataset Stop --dataset Stau      # every sample of two datasets
+    ./launch.sh 'JetMET2024*' TTbar2024            # every era of JetMET2024, then TTbar2024
+    ./launch.sh --dataset QCD2024 --dataset TTbar2024   # every sample of two datasets
     ./launch.sh --list '*'                         # all samples: type, dataset, binning
     ./launch.sh 'Gluino_Run3_MET_madgraph_*' --jobs 3 --out-dir output/gluino
-    ./launch.sh TestMET2024 --dry-run
+    ./launch.sh TestJetMET2024C --dry-run
 
 Samples are selected by fnmatch patterns against the names of cfg/datasets.json, or by
 dataset (a group of samples, e.g. JetMET2024 for the eras C to I). Their ntuples and binning

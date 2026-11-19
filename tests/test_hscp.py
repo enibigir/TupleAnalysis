@@ -28,13 +28,16 @@ class ConfigTests(unittest.TestCase):
 
     def test_repository_file_is_valid(self):
         cfg = config.load(prod_dir="/x/")
-        self.assertIn("TestMET2024", cfg.names)
-        self.assertEqual(cfg.binning("TestMET2024"), config.Binning(70.0, 96, 400, 1000, 400, 20))
-        self.assertEqual(cfg.source("TestMET2024"), ("list", "/x/JetMET2024/testJetMET.txt"))
-        self.assertEqual(cfg.type("Stau_Run3_MET_247"), "signal")
+        self.assertIn("TestJetMET2024C", cfg.names)
+        self.assertEqual(cfg.binning("TestJetMET2024C"), config.Binning(70.0, 96, 400, 1000, 400, 20))
+        self.assertEqual(cfg.source("TestJetMET2024C"), ("list", "/x/input/TestJetMET2024C.txt"))
+        for name in cfg.names:          # every simulated sample can be weighted (python/Weight.py)
+            if cfg.type(name) != "data":
+                self.assertIsNotNone(cfg.xsec(name), name)
+        self.assertEqual(cfg.type("Gluino_Run3_MET_madgraph_1600"), "signal")
         self.assertIn("JetMET2024", cfg.datasets())
         self.assertEqual(cfg.dataset("JetMET2024C"), "JetMET2024")
-        self.assertEqual(len(cfg.select(datasets=["JetMET2024"])), 7)
+        self.assertEqual(len(cfg.select(datasets=["JetMET2024"])), 1)
 
     def test_empty_prod_dir_is_the_repository(self):
         doc = dict(self.DOC, prod_dir="")
