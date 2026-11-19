@@ -14,6 +14,12 @@ import subprocess
 DEFAULT_SUBDIR = "out"            # condor/work/<tag>/out when no --out-dir is given
 LOCATION_FILE = "output_dir.txt"  # written by submit.py in the working directory, read by merge.py
 
+# FNAL LPC: the schedulers (lpcschedd*) see only these file systems, not the local disks of the login
+# nodes (/tmp, /storage/local) nor the EOS FUSE mount (/eos/uscms)
+LPC_SHARED = ("/uscms/home/", "/uscms_data/")
+# CERN LXPLUS: the job directory and the logs cannot be on the EOS FUSE mount (/eos); use AFS
+LXPLUS_UNSUPPORTED = ("/eos/",)
+
 
 class StorageError(RuntimeError):
     pass
@@ -33,7 +39,29 @@ def resolve(out_dir, tag):
             raise StorageError(f"{out_dir}: an XRootD URL needs a double slash before the path, "
                                "e.g. root://cmseos.fnal.gov//store/user/...")
         return out_dir.rstrip("/") + "/" + tag
-    return os.path.join(os.path.abspath(out_dir), tag)
+    return os.path.join(os.path.realpath(out_dir), tag)     # real path: Condor writes there, not the login node
+
+
+def is_lpc(hostname):
+    return hostname.endswith(".fnal.gov") or hostname.startswith("cmslpc")
+
+
+def is_lxplus(hostname):
+    return hostname.startswith("lxplus") or hostname.endswith(".cern.ch")
+
+
+def unshared_for_scheduler(path, hostname):
+    """An error message if the Condor schedulers of this site cannot use path, else None (LPC and LXPLUS)."""
+    p = path.rstrip("/") + "/"
+    if is_lpc(hostname) and not p.startswith(LPC_SHARED):
+        return (f"{path} is not on /uscms/home or /uscms_data: the LPC schedulers cannot see it and every job "
+                "would be held (\"Cannot access initial working directory\", hold code 14). "
+                "Work from ~/nobackup (/uscms_data).")
+    if is_lxplus(hostname) and p.startswith(LXPLUS_UNSUPPORTED):
+        return (f"{path} is on the EOS mount: CERN's HTCondor cannot use it for the job directory, the logs or "
+                "the transferred outputs. Work from AFS (/afs/cern.ch/user/... or your AFS workspace) and send "
+                "the outputs to EOS by URL: --out-dir 'root://eosuser.cern.ch//eos/user/<letter>/$USER/hscp/'.")
+    return None
 
 
 def join(location, name):

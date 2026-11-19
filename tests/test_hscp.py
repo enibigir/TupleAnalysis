@@ -367,6 +367,60 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(storage.read_location(d), "root://h//store/x/t")
             self.assertEqual(storage.listing(os.path.join(d, "nothing")), {})
 
+    def test_resolve_follows_symlinks(self):
+        with tempfile.TemporaryDirectory() as d:
+            real = os.path.realpath(os.path.join(d, "real"))
+            os.mkdir(real)
+            os.symlink(real, os.path.join(d, "link"))
+            self.assertEqual(storage.resolve(os.path.join(d, "link"), "t"), os.path.join(real, "t"))
+
+    def test_lpc_shared_filesystems(self):
+        lpc = "cmslpc301.fnal.gov"
+        self.assertIsNone(storage.unshared_for_scheduler("/uscms_data/d3/me/TupleAnalysis", lpc))
+        self.assertIsNone(storage.unshared_for_scheduler("/uscms/home/me/TupleAnalysis", lpc))
+        for bad in ("/tmp/me/TupleAnalysis", "/storage/local/data1/me", "/eos/uscms/store/user/me", "/uscms_database"):
+            self.assertRegex(storage.unshared_for_scheduler(bad, lpc) or "", "hold code 14", bad)
+        self.assertIsNone(storage.unshared_for_scheduler("/tmp/me", "lxplus912.cern.ch"))   # LPC rule only on the LPC
+        self.assertIsNone(storage.unshared_for_scheduler("/tmp/me", "node.example.org"))   # other sites: no check
+
+    def test_lxplus_refuses_eos(self):
+        for host in ("lxplus912.cern.ch", "lxplus9"):
+            self.assertIsNone(storage.unshared_for_scheduler("/afs/cern.ch/user/m/me/TupleAnalysis", host))
+            for bad in ("/eos/user/m/me/TupleAnalysis", "/eos/home-m/me/hscp/t", "/eos"):
+                self.assertRegex(storage.unshared_for_scheduler(bad, host) or "", "EOS mount", bad)
+        self.assertIsNone(storage.unshared_for_scheduler("/eosx/me", "lxplus912.cern.ch"))
+        self.assertIsNone(storage.unshared_for_scheduler("/eos/user/m/me", "laptop.local"))
+
+
+class SubmitTests(unittest.TestCase):
+    """condor/submit.py run from a symlink to the repository writes the real paths in hscp.sub."""
+    SAMPLE = "TestGluino_Run3_MET_madgraph_1600"
+
+    def test_submit_file_uses_real_paths(self):
+        import shutil
+        import subprocess
+        repo = os.path.realpath(config.REPO)
+        tag = f"_unittest_symlink_{os.getpid()}"
+        work = os.path.join(repo, "condor", "work", tag)
+        with tempfile.TemporaryDirectory() as d:
+            link = os.path.join(d, "checkout")
+            os.symlink(repo, link)
+            try:
+                p = subprocess.run([sys.executable, os.path.join(link, "condor", "submit.py"), "--samples", self.SAMPLE,
+                                    "--tag", tag, "--proxy", "none"], capture_output=True, text=True, cwd=d)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertIn("is a symlink", p.stdout)
+                with open(os.path.join(work, "hscp.sub")) as f:
+                    sub = f.read()
+                with open(os.path.join(work, "jobs.txt")) as f:
+                    jobs = f.read()
+            finally:
+                shutil.rmtree(work, ignore_errors=True)
+        self.assertIn(f"initialdir            = {work}\n", sub)
+        self.assertIn(f"executable            = {repo}/condor/runJob.sh\n", sub)
+        self.assertNotIn(link, sub + jobs)
+        self.assertIn(os.path.join(work, "chunks", f"{self.SAMPLE}_c0.txt"), jobs)
+
 
 if __name__ == "__main__":
     unittest.main()

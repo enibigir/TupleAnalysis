@@ -110,6 +110,12 @@ Check that you can write there before submitting many jobs:
 xrdfs root://cmseos.fnal.gov ls /store/user/$USER          # needs the proxy
 ```
 
+The paths in `hscp.sub` are real paths (symlinks resolved), because the Condor schedulers read
+them, not the login node. On the FNAL LPC, `submit.py` refuses a checkout or a local `--out-dir`
+outside `/uscms/home` and `/uscms_data` (`~/nobackup`): the schedulers cannot see `/tmp`,
+`/storage/local` or `/eos/uscms`, and every job would be held with "Cannot access initial working
+directory" (hold code 14).
+
 #### On CERN LXPLUS
 
 The personal EOS area is `/eos/user/<first letter>/<username>` on `eosuser.cern.ch`. It is
@@ -129,6 +135,26 @@ Write the first letter of the username directly: `submit.py` expands `$USER`, bu
 to `eosuser`. The inputs are still read over `davs://`, so `--proxy auto` still requires a proxy.
 CMS group areas are under `root://eoscms.cern.ch//eos/cms/store/group/...`, and need write
 permission for the group.
+
+Keep the checkout on AFS (`/afs/cern.ch/user/<letter>/$USER` or an AFS workspace), not on `/eos`:
+CERN's HTCondor cannot use the EOS mount for the job directory, the logs or a local `--out-dir`, and
+`submit.py` refuses it on LXPLUS. The outputs go to EOS by URL, as above. The working directories
+(chunk lists, selectors, logs) take a few hundred MB of AFS quota for a few thousand jobs.
+
+Keep the proxy on AFS. `lxplus.cern.ch` sends each login to another node, and `/tmp` is local to
+the node. `hscp.sub` records the proxy path, so a later `condor_submit hscp.sub` (resubmission)
+from another node would not find a proxy left in `/tmp`. `--proxy auto` follows
+`$X509_USER_PROXY`:
+
+```bash
+voms-proxy-init -voms cms -valid 192:00 --out ~/private/x509up
+export X509_USER_PROXY=~/private/x509up        # also in ~/.bashrc
+```
+
+Memory: CERN's batch slots come with about 2 GB per core. A job asking for 3 GB on one core may wait
+longer before it starts, and may count as more than one core in your share. If the measured
+`MemoryUsage` is above 2 GB, ask for 2 cores with the memory: `--cpus 2 --memory '4 GB'` (the
+selector uses the second core through `HSCP_NTHREADS`).
 
 Measure the memory on one real job before submitting a whole dataset: submit a single sample with
 `--files-per-job 5`, then read `MemoryUsage` in `log/condor.log` and set `--memory` from it.

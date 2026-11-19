@@ -42,13 +42,16 @@ $USER and other variables in D are expanded (quote D so that the shell leaves th
 import argparse
 import os
 import shutil
+import socket
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"))
 from hscp import config, driver, proxy, selector, storage  # noqa: E402
 
-REPO = config.REPO
+# the real path, without symlinks: the paths in hscp.sub are read by the schedulers, which may not see
+# a symlink of the login node (LPC: a held job with "Cannot access initial working directory", code 14)
+REPO = os.path.realpath(config.REPO)
 
 
 def _mk(d):
@@ -82,6 +85,11 @@ def main():
     if not patterns and not args.dataset:
         ap.error("give --samples and/or --dataset")
 
+    problem = storage.unshared_for_scheduler(REPO, socket.gethostname())
+    if problem:
+        sys.exit(f"submit: {problem}")
+    if REPO != config.REPO:
+        print(f"note: {config.REPO} is a symlink; the jobs use the real path {REPO}")
     work = os.path.join(REPO, "condor", "work", args.tag)
     if os.path.exists(os.path.join(work, "jobs.txt")):
         sys.exit(f"{work} already holds jobs.txt: choose another --tag or remove the directory")
@@ -90,6 +98,9 @@ def main():
     except storage.StorageError as e:
         sys.exit(f"submit: {e}")
     remote_out = storage.is_url(location)
+    problem = None if remote_out else storage.unshared_for_scheduler(location, socket.gethostname())
+    if problem:
+        sys.exit(f"submit: --out-dir {problem}")
     for d in ("chunks", "sel", "log"):
         os.makedirs(os.path.join(work, d), exist_ok=True)
     if not remote_out:
