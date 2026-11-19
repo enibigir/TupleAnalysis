@@ -28,7 +28,8 @@ Everything is written under condor/work/<tag>/:
     hscp.sub       the submit file
     out/           job outputs (after running), unless --out-dir is given
     output_dir.txt where the job outputs go, read by merge.py
-    log/           Condor logs
+    log/           Condor logs (.out, .err, condor.log), unless --log-dir is given
+    log_dir.txt    where the Condor logs go
 Afterwards: python3 condor/merge.py condor/work/<tag>
 
 Job outputs (--out-dir): by default condor/work/<tag>/out/. With --out-dir D they go to D/<tag>/:
@@ -37,6 +38,10 @@ Job outputs (--out-dir): by default condor/work/<tag>/out/. With --out-dir D the
     root:// and gfal-copy otherwise, and nothing is transferred back but the logs. The job fails
     (and is held) if the copy fails. The jobs then need the grid proxy, which --proxy auto gives them.
 $USER and other variables in D are expanded (quote D so that the shell leaves them alone, or not).
+
+Condor logs (--log-dir): by default condor/work/<tag>/log/. With --log-dir L they go to L/<tag>/, e.g.
+to keep them out of a small home quota (LPC: --log-dir ~/nobackup/hscp_logs). L must be a local
+directory that the schedulers see (LPC: /uscms_data or /uscms/home; LXPLUS: AFS, not /eos).
 """
 
 import argparse
@@ -79,6 +84,8 @@ def main():
                     help="grid proxy given to the jobs (default: auto, i.e. only if an input file is remote)")
     ap.add_argument("--out-dir", metavar="DIR|URL",
                     help="where the job outputs go, in <DIR|URL>/<tag>/ (default: condor/work/<tag>/out/)")
+    ap.add_argument("--log-dir", metavar="DIR",
+                    help="where the Condor logs go, in <DIR>/<tag>/ (default: condor/work/<tag>/log/)")
     ap.add_argument("--submit", action="store_true", help="run condor_submit at the end")
     args = ap.parse_args()
     patterns = [p.strip() for p in args.samples.split(",") if p.strip()]
@@ -101,8 +108,18 @@ def main():
     problem = None if remote_out else storage.unshared_for_scheduler(location, socket.gethostname())
     if problem:
         sys.exit(f"submit: --out-dir {problem}")
-    for d in ("chunks", "sel", "log"):
+    if args.log_dir:
+        if storage.is_url(args.log_dir):
+            sys.exit(f"submit: --log-dir must be a local directory, not {args.log_dir}: Condor writes the logs itself")
+        log_dir = os.path.join(os.path.realpath(os.path.expanduser(os.path.expandvars(args.log_dir))), args.tag)
+        problem = storage.unshared_for_scheduler(log_dir, socket.gethostname())
+        if problem:
+            sys.exit(f"submit: --log-dir {problem}")
+    else:
+        log_dir = os.path.join(work, "log")
+    for d in ("chunks", "sel"):
         os.makedirs(os.path.join(work, d), exist_ok=True)
+    os.makedirs(log_dir, exist_ok=True)
     if not remote_out:
         os.makedirs(location, exist_ok=True)
 
@@ -158,6 +175,8 @@ def main():
         f.write("\n".join(jobs) + "\n")
     with open(os.path.join(work, storage.LOCATION_FILE), "w") as f:
         f.write(location + "\n")
+    with open(os.path.join(work, "log_dir.txt"), "w") as f:
+        f.write(log_dir + "\n")
     try:
         already = storage.listing(location)
         if already:
@@ -185,9 +204,9 @@ when_to_transfer_output = ON_EXIT
 transfer_input_files  = {REPO}/env.sh, {REPO}/compile.sh, {REPO}/inc, {REPO}/src, {work}/sel/g$(group)/macros, $(chunk)
 {transfer_out}
 
-output                = log/$(sample)_g$(group)_c$(chunkid).out
-error                 = log/$(sample)_g$(group)_c$(chunkid).err
-log                   = log/condor.log
+output                = {log_dir}/$(sample)_g$(group)_c$(chunkid).out
+error                 = {log_dir}/$(sample)_g$(group)_c$(chunkid).err
+log                   = {log_dir}/condor.log
 
 request_cpus          = {args.cpus}
 request_memory        = {args.memory}
@@ -204,6 +223,7 @@ queue sample, chunk, group, out, nosel, ptcut, etabins, ihbins, pbins, massbins,
     print(f"\n{len(jobs)} jobs prepared in {work}")
     print(f"submit file: {sub_path}")
     print(f"outputs:     {location}" + ("  (copied by the jobs)" if remote_out else ""))
+    print(f"logs:        {log_dir}")
     print(f"proxy:       {proxy.describe(proxy_path, proxy_left)}")
     if args.submit:
         # through bash, as from a terminal: the condor_submit of some sites (FNAL LPC) is a wrapper

@@ -423,6 +423,39 @@ class SubmitTests(unittest.TestCase):
         self.assertIn(f"executable            = {repo}/condor/runJob.sh\n", sub)
         self.assertNotIn(link, sub + jobs)
         self.assertIn(os.path.join(work, "chunks", f"{self.SAMPLE}_c0.txt"), jobs)
+        self.assertIn(f"log                   = {work}/log/condor.log\n", sub)
+
+    def test_log_dir(self):
+        import shutil
+        import subprocess
+        repo = os.path.realpath(config.REPO)
+        tag = f"_unittest_logdir_{os.getpid()}"
+        work = os.path.join(repo, "condor", "work", tag)
+        submit = os.path.join(repo, "condor", "submit.py")
+        with tempfile.TemporaryDirectory() as d:
+            logs = os.path.join(os.path.realpath(d), tag)
+            try:
+                p = subprocess.run([sys.executable, submit, "--samples", self.SAMPLE, "--tag", tag, "--proxy", "none",
+                                    "--log-dir", d], capture_output=True, text=True)
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                with open(os.path.join(work, "hscp.sub")) as f:
+                    sub = f.read()
+                with open(os.path.join(work, "log_dir.txt")) as f:
+                    recorded = f.read().strip()
+                self.assertTrue(os.path.isdir(logs))
+                self.assertFalse(os.path.exists(os.path.join(work, "log")))
+            finally:
+                shutil.rmtree(work, ignore_errors=True)
+            self.assertEqual(recorded, logs)
+            self.assertIn(f"log                   = {logs}/condor.log\n", sub)
+            self.assertIn(f"error                 = {logs}/$(sample)_g$(group)_c$(chunkid).err\n", sub)
+            self.assertIn(f"logs:        {logs}", p.stdout)
+        # a URL is refused before anything is written
+        p = subprocess.run([sys.executable, submit, "--samples", self.SAMPLE, "--tag", tag, "--proxy", "none",
+                            "--log-dir", "root://eosuser.cern.ch//eos/user/x/xx/logs"], capture_output=True, text=True)
+        self.assertNotEqual(p.returncode, 0)
+        self.assertIn("--log-dir must be a local directory", p.stderr)
+        self.assertFalse(os.path.exists(work))
 
 
 if __name__ == "__main__":

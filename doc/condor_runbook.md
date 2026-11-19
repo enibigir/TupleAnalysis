@@ -109,8 +109,24 @@ Check that you can write there before submitting many jobs:
 xrdfs root://cmseos.fnal.gov ls /store/user/$USER          # needs the proxy
 ```
 
+### Where the Condor logs go (`--log-dir`)
+
+By default the `.out`, `.err` and `condor.log` files go to `condor/work/<tag>/log/`. A few thousand
+jobs can fill a small home quota ("(errno 122) Disk quota exceeded", e.g. a checkout in
+`/uscms/home` on the LPC). `--log-dir L` writes them to `L/<tag>/` instead:
+
+```bash
+python3 condor/submit.py --dataset QCD2024 --tag qcd_v1 --log-dir ~/nobackup/hscp_logs \
+        --out-dir 'root://cmseos.fnal.gov//store/user/$USER/hscp/'
+# logs:        /uscms_data/d3/<you>/hscp_logs/qcd_v1
+```
+
+`L` must be a local directory that the schedulers see, like the checkout (below); a URL is refused,
+since Condor writes the logs itself. The location is recorded in `condor/work/<tag>/log_dir.txt`.
+Jobs held for the quota can be released (`condor_release <ClusterId>`) once space is freed.
+
 The paths in `hscp.sub` are real paths (symlinks resolved), because the Condor schedulers read
-them, not the login node. On the FNAL LPC, `submit.py` refuses a checkout or a local `--out-dir`
+them, not the login node. On the FNAL LPC, `submit.py` refuses a checkout, a local `--out-dir` or a `--log-dir`
 outside `/uscms/home` and `/uscms_data` (`~/nobackup`): the schedulers cannot see `/tmp`,
 `/storage/local` or `/eos/uscms`, and every job would be held with "Cannot access initial working
 directory" (hold code 14).
@@ -156,7 +172,8 @@ longer before it starts, and may count as more than one core in your share. If t
 selector uses the second core through `HSCP_NTHREADS`).
 
 Measure the memory on one real job before submitting a whole dataset: submit a single sample with
-`--files-per-job 5`, then read `MemoryUsage` in `log/condor.log` and set `--memory` from it.
+`--files-per-job 5`, then read `MemoryUsage` in `log/condor.log` and set `--memory` from it (in the
+`--log-dir` if you gave one).
 
 ## 6. Submit and follow
 
@@ -165,7 +182,7 @@ cd condor/work/jetmet_v1
 condor_submit hscp.sub             # or add --submit to the submit.py command above
 condor_q                           # running / idle / held
 condor_q -hold -af HoldReason      # jobs held because runJob.sh exited with an error
-tail -f log/condor.log
+tail -f log/condor.log             # with --log-dir: tail -f $(cat log_dir.txt)/condor.log
 less log/JetMET2024C_g0_c0.err
 cd ../../..
 ```
