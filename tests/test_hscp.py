@@ -458,5 +458,35 @@ class SubmitTests(unittest.TestCase):
         self.assertFalse(os.path.exists(work))
 
 
+
+class MergeTests(unittest.TestCase):
+    """condor/merge.py --check reads the outputs from --input-dir instead of output_dir.txt."""
+
+    def test_input_dir(self):
+        import subprocess
+        merge = os.path.join(os.path.realpath(config.REPO), "condor", "merge.py")
+        with tempfile.TemporaryDirectory() as work, tempfile.TemporaryDirectory() as other:
+            with open(os.path.join(work, "jobs.txt"), "w") as f:
+                f.write("A /c/A_c0.txt 0 A_g0_c0.root 1 0\nA /c/A_c1.txt 0 A_g0_c1.root 1 1\n")
+            with open(os.path.join(work, storage.LOCATION_FILE), "w") as f:
+                f.write(os.path.join(work, "nowhere") + "\n")
+            for name in ("A_g0_c0.root", "A_g0_c1.root"):
+                with open(os.path.join(other, name), "wb") as f:
+                    f.write(b"x" * 2048)
+            run = lambda *extra: subprocess.run([sys.executable, merge, work, "--check", *extra],
+                                                capture_output=True, text=True)
+            p = run()                                   # output_dir.txt: nothing there
+            self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+            self.assertIn("2 / 2 missing", p.stdout)
+            p = run("--input-dir", other)
+            self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+            self.assertIn(f"job outputs: {os.path.realpath(other)}", p.stdout.replace(other, os.path.realpath(other)))
+            self.assertIn("complete", p.stdout)
+            self.assertFalse(os.path.exists(os.path.join(work, "resubmit.txt")))
+            p = run("--input-dir", os.path.join(other, "nope"))
+            self.assertNotEqual(p.returncode, 0)
+            self.assertIn("is not a directory", p.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

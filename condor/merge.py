@@ -5,10 +5,12 @@ Check the outputs of a condor/submit.py working directory and merge them with ha
     python3 condor/merge.py condor/work/<tag>            # check, then merge the complete datasets
     python3 condor/merge.py condor/work/<tag> --check    # check only
     python3 condor/merge.py condor/work/<tag> --force    # merge even if chunks are missing
+    python3 condor/merge.py condor/work/<tag> --input-dir 'root://eosuser.cern.ch//eos/user/e/$USER/hscp/<tag>'
 
 For each sample, every chunk of every selection group must be present where the jobs wrote it:
 condor/work/<tag>/out/, or the --out-dir given to submit.py (recorded in <work>/output_dir.txt),
-a local directory or a URL. A root:// directory is listed with xrdfs, any other URL with gfal-ls,
+a local directory or a URL. --input-dir reads them from another place instead (the full directory,
+<tag> included; $USER and ~ are expanded), e.g. outputs moved or copied after the jobs. A root:// directory is listed with xrdfs, any other URL with gfal-ls,
 and hadd reads the remote files directly (it needs the grid proxy).
 Missing jobs are written to <work>/resubmit.txt; submit them again with
     condor_submit <work>/hscp.sub -queue 'dataset, ... from resubmit.txt'   (same column order)
@@ -35,6 +37,8 @@ def main():
     ap.add_argument("work")
     ap.add_argument("--check", action="store_true", help="only report, do not merge")
     ap.add_argument("--force", action="store_true", help="merge incomplete samples too")
+    ap.add_argument("--input-dir", metavar="DIR|URL",
+                    help="where the job outputs are (default: the location in <work>/output_dir.txt)")
     ap.add_argument("--min-size", type=int, default=1024, help="bytes below which an output is treated as missing")
     args = ap.parse_args()
 
@@ -52,7 +56,14 @@ def main():
                 continue
             per_sample.setdefault(parts[0], []).append((parts[3], line.rstrip("\n")))
 
-    location = storage.read_location(work)
+    if args.input_dir:
+        location = os.path.expandvars(args.input_dir)
+        if not storage.is_url(location):
+            location = os.path.abspath(os.path.expanduser(location))
+            if not os.path.isdir(location):
+                sys.exit(f"merge: --input-dir {location} is not a directory")
+    else:
+        location = storage.read_location(work)
     try:
         sizes = storage.listing(location)
     except storage.StorageError as e:

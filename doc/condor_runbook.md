@@ -210,6 +210,16 @@ ls condor/work/jetmet_v1/merged/   # one <sample>.root per sample
 The merged files are always written locally, in `condor/work/<tag>/merged/`. With a remote
 `--out-dir`, `hadd` reads the job outputs directly from the storage (it needs the proxy).
 
+`merge.py` finds the job outputs through `condor/work/<tag>/output_dir.txt`. To read them from
+somewhere else (outputs moved or copied after the jobs), give the full directory, `<tag>` included:
+
+```bash
+python3 condor/merge.py condor/work/jetmet_v1 --check \
+        --input-dir 'root://eosuser.cern.ch//eos/user/e/$USER/hscp/jetmet_v1'
+```
+
+`--input-dir` takes a local directory or a URL, like `--out-dir`; `$USER` and `~` are expanded.
+
 ## 9. Weight the simulation by cross-section
 
 `python/Weight.py` scales every histogram of each simulated sample by
