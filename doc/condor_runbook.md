@@ -269,6 +269,7 @@ python3 python/Weight.py --dataset JetMET2024 --input-dir condor/work/jetmet_v1/
 | `--lumi L` | luminosity in pb^-1 for this run, instead of the one in `datasets.json` |
 | `--dry-run` | print the table of factors only |
 | `-f` | overwrite an existing output |
+| `--skip-missing` | leave out the samples whose `<sample>.root` is missing (listed as a warning) instead of stopping |
 | `--config FILE` | another datasets file |
 
 The dry run prints, for each sample, `xsec`, the sum of weights and where it comes from

@@ -29,6 +29,18 @@ def factor(xsec, luminosity, sum_weights):
     return xsec * luminosity / sum_weights
 
 
+def available(paths, skip_missing=False):
+    """Split {sample: input file} into (samples whose file exists, missing files). A missing file is an
+    error unless skip_missing; at least one sample must be left."""
+    present = [s for s, p in paths.items() if os.path.isfile(p)]
+    missing = [p for s, p in paths.items() if not os.path.isfile(p)]
+    if missing and not skip_missing:
+        raise WeightError("missing input file(s) (--skip-missing leaves those samples out):\n  " + "\n  ".join(missing))
+    if not present:
+        raise WeightError("none of the input files exists:\n  " + "\n  ".join(missing))
+    return present, missing
+
+
 def plan(cfg, samples, luminosity, sum_weights_of):
     """The weight of each sample, as a list of Entry.
 

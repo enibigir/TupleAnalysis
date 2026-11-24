@@ -327,6 +327,17 @@ class WeightTests(unittest.TestCase):
         with self.assertRaisesRegex(weight.WeightError, "Q1: sum of weights 0"):
             weight.plan(self.cfg, ["Q1"], 1000.0, lambda s: 0.0)
 
+    def test_missing_inputs(self):
+        with tempfile.TemporaryDirectory() as d:
+            paths = {s: os.path.join(d, f"{s}.root") for s in ("Q1", "Q2")}
+            open(paths["Q1"], "w").close()
+            with self.assertRaisesRegex(weight.WeightError, "missing input.*--skip-missing"):
+                weight.available(paths)
+            self.assertEqual(weight.available(paths, skip_missing=True), (["Q1"], [paths["Q2"]]))
+            os.remove(paths["Q1"])
+            with self.assertRaisesRegex(weight.WeightError, "none of the input files"):
+                weight.available(paths, skip_missing=True)
+
     def test_default_output(self):
         self.assertEqual(weight.default_output(self.cfg, ["Q1", "Q2"], "m"), os.path.join("m", "QCD_weighted.root"))
         self.assertIsNone(weight.default_output(self.cfg, ["Q1", "S1"], "m"))

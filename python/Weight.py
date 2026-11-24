@@ -19,6 +19,10 @@ sum_weights if the ntuples were skimmed, or if the generator weights are not all
 Profiles are added with these factors as weights; their mean values are not scaled. Data samples are
 added with factor 1. Data and simulation cannot be mixed in one output.
 
+A missing <sample>.root stops the script, unless --skip-missing is given: those samples are then left
+out of the sum (listed as a warning), and the output holds only the samples found. Each sample keeps its
+own factor, so the result is the sum of the samples present, not an estimate of the full dataset.
+
 The default output is <input-dir>/<dataset>_weighted.root when all the samples belong to one dataset.
 Histograms are processed one name at a time, so memory stays small whatever the size of the files.
 """
@@ -41,6 +45,8 @@ def parse_args(argv):
     ap.add_argument("--config", default=config.DATASETS_FILE, help="datasets file (default: %(default)s)")
     ap.add_argument("--dry-run", action="store_true", help="print the factors only")
     ap.add_argument("-f", "--force", action="store_true", help="overwrite an existing output")
+    ap.add_argument("--skip-missing", action="store_true",
+                    help="leave out the samples whose <sample>.root is missing instead of stopping")
     return ap.parse_args(argv)
 
 
@@ -132,9 +138,13 @@ def main(argv=None):
         sys.exit(f"Weight: {e}")
 
     paths = {s: os.path.join(args.input_dir, f"{s}.root") for s in samples}
-    missing = [p for p in paths.values() if not os.path.isfile(p)]
+    try:
+        samples, missing = weight.available(paths, args.skip_missing)
+    except weight.WeightError as e:
+        sys.exit(f"Weight: {e}")
     if missing:
-        sys.exit("Weight: missing input file(s):\n  " + "\n  ".join(missing))
+        print(f"warning: {len(missing)} sample(s) left out, their input is missing:\n  " + "\n  ".join(missing) + "\n")
+        paths = {s: paths[s] for s in samples}
     output = args.output or weight.default_output(cfg, samples, args.input_dir)
     if not output and not args.dry_run:
         sys.exit("Weight: the samples belong to several datasets: give -o")
