@@ -1,5 +1,5 @@
 {
-  "_comment": "Inputs of python/plots.py: paths relative to the repository. An input is a path or {\"file\", \"label\"}; labels are ROOT TLatex. The full configuration (all backgrounds, all plots) is in backup/plots.json. See python/hscp/plots.py.",
+  "_comment": "Inputs of python/plots.py: paths relative to the repository. An input is a path or {\"file\", \"label\"}; labels are ROOT TLatex. In args, null leaves a background or a gluino mass slot out. The full configuration (all backgrounds, all plots) is in backup/plots.json. See python/hscp/plots.py.",
   "output_dir": "outputDisplay/v1",
   "lumi_label": "7.98 fb^{-1} (13.6 TeV)",
   "inputs": {
@@ -7,8 +7,23 @@
     "qcd":    {"file": "output/qcd_v1/QCD2024_7p98fb_weighted.root", "label": "QCD (#mu enriched)"},
     "gluino": {"file": "output/gluino1600_v1/Gluino_1600_weighted.root", "label": "m#scale[0.7]{#tilde{g}}=1600 GeV"}
   },
+  "stack": {"data": "data", "backgrounds": ["qcd"], "signals": ["gluino"]},
   "plots": [
-    {"function": "CompareKinematics", "args": ["data", "gluino", "gluino", "gluino"],
-     "note": "pT, eta, phi of data and the gluino; the function takes three masses, 1600 is given for each"}
+    {"function": "Cutflows", "args": ["qcd", null, null, null, "data", "gluino"],
+     "note": "QCD, ttbar, ttbar semileptonic, W+jets, data, signal: only QCD as background"},
+    {"function": "nPV", "args": ["qcd", null, null, "data"],
+     "note": "QCD, ttbar, W+jets, data"},
+    {"function": "nHSCP", "args": ["qcd", null, null, "data"],
+     "note": "QCD, ttbar, W+jets, data"},
+    {"function": "FpixelPlot", "args": [null, "data", "gluino"],
+     "note": "W+jets, data, signal: the signal Fpixel only"},
+    {"function": "FpixSlices", "args": [null, null, "qcd", "gluino"],
+     "note": "W+jets, ttbar, QCD, signal: Fpixel quantiles printed in the log"},
+    {"function": "CompareMaping", "args": [null, null, "qcd", "gluino"],
+     "note": "ttbar, W+jets, QCD, signal: the background is QCD only"},
+    {"function": "Acceptance_EtaSlice_DataMC", "args": ["data", null, null, "qcd"],
+     "note": "data, W+jets, ttbar, QCD"},
+    {"function": "CompareKinematics", "args": ["data", "gluino", null, null],
+     "note": "data and up to three gluino masses: the 1600 one in the first slot (files named ..._1400)"}
   ]
 }

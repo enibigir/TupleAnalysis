@@ -330,6 +330,43 @@ luminosity text of the plots that print one (`Cutflows`, `CompareKinematics`). T
 `YieldAfterSF` (the signal) take these labels; an input without a label keeps the text of the macro.
 `--list` shows the label of each input.
 
+A background or a gluino mass slot can be left out with `null` in `args`, for instance with QCD as the
+only background, or a single gluino mass for `CompareKinematics`:
+
+```json
+{"function": "Cutflows",          "args": ["qcd", null, null, null, "data", "gluino"]},
+{"function": "CompareKinematics", "args": ["data", "gluino", null, null]}
+```
+
+The plot then stacks or sums the backgrounds given, and the log says which samples were left out. Data
+and the signal stay required, and a plot needs at least one background (`ERROR: ... give at least one
+background`, exit code 4). `YieldAfterSF` only needs the files of its selection (MET: `wjets`, `dataMET`,
+`gluino`; Mu: `wjets`, `dataMu`, `gluino`; MuonEG: `ttbar`, `dataMuonEG`, `gluino`).
+
+### Stacked histograms of any 1D histogram (`python/stack.py`)
+
+`python/stack.py` draws data on the stacked backgrounds, the signals as lines and a data/MC ratio, for any
+1D histogram of the outputs, by name or pattern. It uses the inputs, labels and `lumi_label` of
+`cfg/plots.json`, and its `stack` block for the samples (backgrounds in stacking order, the first at the
+bottom); an input may set its `"color"` (a ROOT number, or a name such as `"kRed+2"`):
+
+```json
+"stack": {"data": "data", "backgrounds": ["qcd", "ttbar", "wjets"], "signals": ["gluino"]}
+```
+
+```bash
+source env.sh
+python3 python/stack.py --list 'METanalysis_TestPUppiMETCut_Eta2p4_*'        # the 1D histograms matching
+python3 python/stack.py METanalysis_TestPUppiMETCut_Eta2p4_Fpix EventCutflow --logy --signal-scale 100
+python3 python/stack.py 'Nm1_event_*' --rebin 2 --format pdf,png
+python3 python/stack.py Nosel_eta --data '' --bkg qcd --signal gluino --xmin -2.4 --xmax 2.4   # no data
+```
+
+One file per histogram in `<output_dir>/stack/` (`--output-dir`), with `_log` for `--logy`; the integral
+of each sample is printed. A sample without the histogram is left out of that plot with a warning. The
+ratio band is the statistical uncertainty of the summed backgrounds. Other options: `--ymin`, `--ymax`,
+`--xtitle`, `--no-ratio`.
+
 ```bash
 source env.sh
 python3 python/plots.py --list                  # each plot, its inputs, MISSING for those not found

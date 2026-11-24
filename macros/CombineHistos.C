@@ -15,6 +15,7 @@
 #include <TPaveText.h>
 #include <TSystem.h>
 #include <cstdarg>
+#include <cstring>
 #include <map>
 #include <string>
 
@@ -29,6 +30,21 @@ std::map<std::string, std::string> gLabels;
 const char *Label(const char *key, const char *fallback) {
     auto it = gLabels.find(key);
     return it != gLabels.end() ? it->second.c_str() : fallback;
+}
+
+// Stops the plot with an error message (python/plots.py reports it as exit code 4).
+void Abort(const char *msg) {
+    std::cerr << "ERROR: " << msg << std::endl;
+    gSystem->Exit(4);
+}
+
+// An input that may be left out: no file for an empty path (python/plots.py passes "" for null in
+// cfg/plots.json); a path that cannot be opened stops the plot.
+TFile *OpenOptional(const char *path) {
+    if (!path || !*path) return nullptr;
+    TFile *f = TFile::Open(path, "READ");
+    if (!f || f->IsZombie()) Abort(Form("cannot open %s", path));
+    return f;
 }
 
 // gOutDir/<name>, name given printf-style; the parent directory is created if needed.
@@ -1442,25 +1458,28 @@ void Cutflows(std::string QCD,
 
     TFile *ofile = new TFile(OutPath("EventCutflow.root"), "RECREATE");
 
-    TFile *ifile_QCD = new TFile(QCD.c_str(), "READ");
-    TFile *ifile_TTbar = new TFile(TTbar.c_str(), "READ");
-    TFile *ifile_TTbarSemiLep = new TFile(TTbarSemiLep.c_str(), "READ");
-    TFile *ifile_Wjets = new TFile(Wjets.c_str(), "READ");
     TFile *ifile_JetMETdata = new TFile(JetMETdata.c_str(), "READ");
     TFile *ifile_Gluino2000 = new TFile(Gluino2000.c_str(), "READ");
-
-    TH1D *Cutflow_QCD = (TH1D*)ifile_QCD->Get("EventCutflow");
-    TH1D *Cutflow_TTbar = (TH1D*)ifile_TTbar->Get("EventCutflow");
-    TH1D *Cutflow_TTbarSemiLep = (TH1D*)ifile_TTbarSemiLep->Get("EventCutflow");
-    TH1D *Cutflow_Wjets = (TH1D*)ifile_Wjets->Get("EventCutflow");
     TH1D *Cutflow_JetMETdata = (TH1D*)ifile_JetMETdata->Get("EventCutflow");
     TH1D *Cutflow_Gluino2000 = (TH1D*)ifile_Gluino2000->Get("EventCutflow");
 
+    // backgrounds in stacking order; an empty path leaves the sample out
+    struct Bkg { std::string path; const char *key; const char *label; int color; TH1D *h; };
+    std::vector<Bkg> bkgs;
+    for (Bkg b : std::vector<Bkg>{{QCD, "QCD", "QCD (#mu enriched)", kGreen, nullptr},
+                                  {TTbar, "TTbar", "t#bar{t}#rightarrow2l2#nu", kRed, nullptr},
+                                  {TTbarSemiLep, "TTbarSemiLep", "t#bar{t}#rightarrowl#nu", kRed+2, nullptr},
+                                  {Wjets, "Wjets", "W(#rightarrow#mu#nu)+jets", kBlue-7, nullptr}}) {
+        TFile *f = OpenOptional(b.path.c_str());
+        if (!f) { std::cout << "Cutflows: " << b.key << " left out" << std::endl; continue; }
+        b.h = (TH1D*)f->Get("EventCutflow");
+        if (!b.h) Abort(Form("no EventCutflow in %s", b.path.c_str()));
+        bkgs.push_back(b);
+    }
+    if (bkgs.empty()) Abort("Cutflows: give at least one background");
+
     THStack *hs = new THStack("hs", "");
-    hs->Add(Cutflow_QCD);
-    hs->Add(Cutflow_TTbar);
-    hs->Add(Cutflow_TTbarSemiLep);
-    hs->Add(Cutflow_Wjets);
+    for (auto &b : bkgs) hs->Add(b.h);
 
     auto PrintCutflowPercent = [](TH1D* h, const std::string& name, int cut = 1)
     {
@@ -1480,22 +1499,14 @@ void Cutflows(std::string QCD,
     };
 
     // --- Style   
-    int colorWjets = kBlue-7;
-    int colorTTbar = kRed;
-    int colorTTbarSemiLep = kRed+2;
-    int colorQCD = kGreen;
     int colorSignal = kOrange+8;
     int colorJetMET = kBlack;
     gStyle->SetOptStat(0);
 
-    Cutflow_Wjets->SetFillColorAlpha(colorWjets, 0.5);
-    Cutflow_Wjets->SetLineColor(colorWjets);
-    Cutflow_TTbar->SetFillColorAlpha(colorTTbar, 0.5);
-    Cutflow_TTbar->SetLineColor(colorTTbar);
-    Cutflow_TTbarSemiLep->SetFillColorAlpha(colorTTbarSemiLep, 0.5);
-    Cutflow_TTbarSemiLep->SetLineColor(colorTTbarSemiLep);
-    Cutflow_QCD->SetFillColorAlpha(colorQCD, 0.5);
-    Cutflow_QCD->SetLineColor(colorQCD);
+    for (auto &b : bkgs) {
+        b.h->SetFillColorAlpha(b.color, 0.5);
+        b.h->SetLineColor(b.color);
+    }
     Cutflow_Gluino2000->SetLineColor(colorSignal);
     Cutflow_Gluino2000->SetMarkerColor(colorSignal);
     Cutflow_Gluino2000->SetMarkerStyle(22);
@@ -1536,10 +1547,9 @@ void Cutflows(std::string QCD,
     leg->SetBorderSize(0);
     leg->SetNColumns(2);
     leg->AddEntry(Cutflow_JetMETdata, Label("JetMETdata", "MET data"),"lep");
-    leg->AddEntry(Cutflow_Wjets, Label("Wjets", "W(#rightarrow#mu#nu)+jets"), "f");
-    leg->AddEntry(Cutflow_TTbar, Label("TTbar", "t#bar{t}#rightarrow2l2#nu"), "f");
-    leg->AddEntry(Cutflow_TTbarSemiLep, Label("TTbarSemiLep", "t#bar{t}#rightarrowl#nu"), "f");
-    leg->AddEntry(Cutflow_QCD, Label("QCD", "QCD (#mu enriched)"), "f");
+    for (const char *key : {"Wjets", "TTbar", "TTbarSemiLep", "QCD"})      // legend order
+        for (auto &b : bkgs)
+            if (!strcmp(b.key, key)) leg->AddEntry(b.h, Label(b.key, b.label), "f");
     leg->AddEntry(Cutflow_Gluino2000, Form("%s x100", Label("Gluino2000", "#tilde{g} (m=2000 GeV)")), "ep");
     leg->Draw();
 
@@ -1552,12 +1562,9 @@ void Cutflows(std::string QCD,
                 ,"High Purity","#chi^{2}/N_{dof}<5","|d_{z}|<0.1","|d_{xy}|<0.02","I^{rel}_{PF}<0.02","I^{trk}_{dr03}<15",
                 "E/p<0.3","#sigma_{p_{T}}/p_{T}^{2}<0.0008","#sigma_{p_{T}}/p_{T}<1","F_{pixel}>0.3","I_{h}>C"};
 
-    for (int i = 1; i <= Cutflow_Wjets->GetNbinsX(); i++) {
+    for (int i = 1; i <= bkgs[0].h->GetNbinsX(); i++) {
         if (i-1 < xlabel.size()) {
-            Cutflow_Wjets->GetXaxis()->SetBinLabel(i, xlabel[i-1]);
-            Cutflow_TTbar->GetXaxis()->SetBinLabel(i, xlabel[i-1]);
-            Cutflow_TTbarSemiLep->GetXaxis()->SetBinLabel(i, xlabel[i-1]);
-            Cutflow_QCD->GetXaxis()->SetBinLabel(i, xlabel[i-1]);
+            for (auto &b : bkgs) b.h->GetXaxis()->SetBinLabel(i, xlabel[i-1]);
             hs->GetXaxis()->SetBinLabel(i, xlabel[i-1]);
         }
     }
@@ -1578,11 +1585,7 @@ void Cutflows(std::string QCD,
 
     // Cout values:
     PrintCutflowPercent(Cutflow_JetMETdata, "JetMET data", 1);
-    TH1D* Cutflow_MC = (TH1D*)Cutflow_Wjets->Clone("Cutflow_MC");
-    //Cutflow_MC->Add(Cutflow_TTbar);
-    //Cutflow_MC->Add(Cutflow_TTbarSemiLep);
-    //Cutflow_MC->Add(Cutflow_QCD);
-    PrintCutflowPercent(Cutflow_MC, "MC (Wjets + TTbar + TTbarSemiLep + QCD)", 1);
+    for (auto &b : bkgs) PrintCutflowPercent(b.h, b.key, 1);
     PrintCutflowPercent(Cutflow_Gluino2000, "Signal m=2000", 1);
 
 
@@ -2684,9 +2687,10 @@ void CompareMaping(const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p9_
 
     TFile *ofile = new TFile(OutPath("CompareMapping.root"), "RECREATE");
 
-    TFile *ifileTTbar2024 = new TFile(ttbar, "READ");
-    TFile *ifileWjets2024 = new TFile(wjets, "READ");
-    TFile *ifileQCD2024 = new TFile(qcd, "READ");
+    // backgrounds: an empty path leaves the sample out of the sum
+    TFile *ifileTTbar2024 = OpenOptional(ttbar);
+    TFile *ifileWjets2024 = OpenOptional(wjets);
+    TFile *ifileQCD2024 = OpenOptional(qcd);
     TFile *GluinoRun3madgraph = new TFile(gluino, "READ");
 
     TLatex *latex1 = new TLatex(0.155, 0.91, "#it{Private work (CMS simulation)}");
@@ -2696,15 +2700,18 @@ void CompareMaping(const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p9_
 
 
     // load histograms
-    TH2F *pT_vs_fpix_ttbar = (TH2F*)ifileTTbar2024->Get("METanalysis_TestPUppiMETCut_Eta2p4_pT_vs_Fpixel");
-    TH2F *pT_vs_fpix_wjets = (TH2F*)ifileWjets2024->Get("METanalysis_TestPUppiMETCut_Eta2p4_pT_vs_Fpixel");
-    TH2F *pT_vs_fpix_qcd = (TH2F*)ifileQCD2024->Get("METanalysis_TestPUppiMETCut_Eta2p4_pT_vs_Fpixel");
     TH2F *pT_vs_fpix_gluino = (TH2F*)GluinoRun3madgraph->Get("METanalysis_TestPUppiMETCut_Eta2p4_pT_vs_Fpixel");
 
-    // sum the MC backgrounds together
-    TH2F *pT_vs_fpix_bkg = (TH2F*)pT_vs_fpix_ttbar->Clone("pT_vs_fpix_bkg");
-    pT_vs_fpix_bkg->Add(pT_vs_fpix_wjets);
-    pT_vs_fpix_bkg->Add(pT_vs_fpix_qcd);
+    // sum the MC backgrounds given together
+    TH2F *pT_vs_fpix_bkg = nullptr;
+    for (TFile *f : {ifileTTbar2024, ifileWjets2024, ifileQCD2024}) {
+        if (!f) continue;
+        TH2F *h = (TH2F*)f->Get("METanalysis_TestPUppiMETCut_Eta2p4_pT_vs_Fpixel");
+        if (!h) Abort(Form("CompareMaping: no METanalysis_TestPUppiMETCut_Eta2p4_pT_vs_Fpixel in %s", f->GetName()));
+        if (!pT_vs_fpix_bkg) pT_vs_fpix_bkg = (TH2F*)h->Clone("pT_vs_fpix_bkg");
+        else pT_vs_fpix_bkg->Add(h);
+    }
+    if (!pT_vs_fpix_bkg) Abort("CompareMaping: give at least one background");
 
     // divide the gluino histogram by the bkg histogram to see where the signal is enhanced
     TH2F *pT_vs_fpix_ratio = (TH2F*)pT_vs_fpix_gluino->Clone("pT_vs_fpix_ratio");
@@ -2862,31 +2869,28 @@ void FpixelPlot(const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p11
 
     TFile *ofile = new TFile(OutPath("Nm1_plots.root"), "RECREATE");
 
-    TFile *fileWjets = new TFile(wjets, "READ");
+    TFile *fileWjets = OpenOptional(wjets);                // the background may be left out (empty path)
     TFile *ifile_JetMETdata = new TFile(data, "READ");
     TFile *ifile_Gluino = new TFile(gluino, "READ");
 
 
     TH1F *fpix_JetMETdata = (TH1F*)ifile_JetMETdata->Get("Nosel_Fpix");
     TH1F *fpix_Gluino = (TH1F*)ifile_Gluino->Get("Nosel_Fpix");
-    TH1F *fpix_Wjets = (TH1F*)fileWjets->Get("Nosel_Fpix");
+    TH1F *fpix_Wjets = fileWjets ? (TH1F*)fileWjets->Get("Nosel_Fpix") : nullptr;
     fpix_JetMETdata->Scale(1./fpix_JetMETdata->Integral());
     fpix_Gluino->Scale(1./fpix_Gluino->Integral());
-    fpix_Wjets->Scale(1./fpix_Wjets->Integral());
-
-    fpix_Wjets->SetBinContent(1,0);
-    fpix_Wjets->SetBinContent(2,0);
-    fpix_Wjets->SetBinContent(3,0);
-    fpix_Wjets->SetBinContent(4,0);
-    fpix_Wjets->SetBinContent(5,0);
+    if (fpix_Wjets) {
+        fpix_Wjets->Scale(1./fpix_Wjets->Integral());
+        for (int bin = 1; bin <= 5; bin++) fpix_Wjets->SetBinContent(bin, 0);
+        fpix_Wjets->SetLineWidth(2);
+        fpix_Wjets->SetLineColor(kBlue);
+    }
 
     fpix_Gluino->SetBinContent(1,0);
     fpix_Gluino->SetBinContent(2,0);
     fpix_Gluino->SetBinContent(3,0);
     fpix_Gluino->SetBinContent(4,0);
     fpix_Gluino->SetBinContent(5,0);
-
-    fpix_Wjets->SetLineWidth(2);
 
     //draw vertical dashed line black at fpix = 0.9
     TLine *line = new TLine(0.9, 0, 0.9, fpix_Gluino->GetMaximum()*1.05);
@@ -2912,14 +2916,13 @@ void FpixelPlot(const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p11
     fpix_Gluino->GetYaxis()->SetTitle("Events (normalised)");
     fpix_Gluino->SetFillColorAlpha(kRed, 0.5);
     fpix_Gluino->SetLineColor(kRed);
-    fpix_Wjets->SetLineColor(kBlue);
     fpix_Gluino->Draw("HIST");
-    fpix_Wjets->Draw("HIST same");
+    if (fpix_Wjets) fpix_Wjets->Draw("HIST same");
     line->Draw("same");
     //fpix_JetMETdata->Draw("E1 same");
     TLegend *legend_fpix = new TLegend(0.2, 0.5, 0.5, 0.7);
     //legend_fpix->AddEntry(fpix_JetMETdata, "JetMET 2024 data", "lep");
-    legend_fpix->AddEntry(fpix_Wjets, Label("wjets", "MC Wjet 2024"), "lep");
+    if (fpix_Wjets) legend_fpix->AddEntry(fpix_Wjets, Label("wjets", "MC Wjet 2024"), "lep");
     legend_fpix->AddEntry(fpix_Gluino, Label("gluino", "#tilde{g}_{m=2000 GeV}"), "f");
     legend_fpix->SetBorderSize(0);
     legend_fpix->SetFillStyle(0);
@@ -3163,82 +3166,60 @@ void nHSCP(const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.ro
 
     gErrorIgnoreLevel = kError;
 
-    TFile *ifileQCD = new TFile(qcd, "READ");
-    TFile *ifileTTbar = new TFile(ttbar, "READ");
-    TFile *ifileWjetMuNu = new TFile(wjets, "READ");
+    // backgrounds in stacking order; an empty path leaves the sample out
+    struct Bkg { const char *path; const char *key; const char *label; int color; TFile *f; };
+    std::vector<Bkg> bkgs;
+    for (Bkg b : std::vector<Bkg>{{qcd, "qcd", "QCD muEnriched", kGreen-4, nullptr},
+                                  {ttbar, "ttbar", "TTbar", kRed, nullptr},
+                                  {wjets, "wjets", "W+jets", kBlue-7, nullptr}}) {
+        b.f = OpenOptional(b.path);
+        if (b.f) bkgs.push_back(b);
+        else std::cout << "nHSCP: " << b.key << " left out" << std::endl;
+    }
     TFile *ifileMET = new TFile(data, "READ");
 
-    TH1F *nHSCP_QCD = (TH1F*)ifileQCD->Get("nHSCP");
-    TH1F *nHSCP_TTbar = (TH1F*)ifileTTbar->Get("nHSCP");
-    TH1F *nHSCP_WjetMuNu = (TH1F*)ifileWjetMuNu->Get("nHSCP");
     TH1F *nHSCP_MET = (TH1F*)ifileMET->Get("nHSCP");
-
-    TH1F *Sel_nHSCP_QCD = (TH1F*)ifileQCD->Get("METanalysis_Eta2p4_nHSCP");
-    TH1F *Sel_nHSCP_TTbar = (TH1F*)ifileTTbar->Get("METanalysis_Eta2p4_nHSCP");
-    TH1F *Sel_nHSCP_WjetMuNu = (TH1F*)ifileWjetMuNu->Get("METanalysis_Eta2p4_nHSCP");
     TH1F *Sel_nHSCP_MET = (TH1F*)ifileMET->Get("METanalysis_Eta2p4_nHSCP");
 
-    // draw on the same canvas with a tstack for bkg
-    TCanvas *c_nHSCP = new TCanvas("c_nHSCP", "c_nHSCP", 800, 600);
-    THStack *hs_nHSCP = new THStack("hs_nHSCP", "");
-    nHSCP_QCD->SetLineColor(kGreen-4);
-    nHSCP_QCD->SetFillColorAlpha(kGreen-4, 0.5);
-    nHSCP_TTbar->SetLineColor(kRed);
-    nHSCP_TTbar->SetFillColorAlpha(kRed, 0.5);
-    nHSCP_WjetMuNu->SetLineColor(kBlue-7);
-    nHSCP_WjetMuNu->SetFillColorAlpha(kBlue-7, 0.5);
-    nHSCP_MET->SetLineColor(kBlack);
-    nHSCP_MET->SetMarkerColor(kBlack);
-    nHSCP_MET->SetMarkerStyle(20);
-
-    hs_nHSCP->Add(nHSCP_QCD);
-    hs_nHSCP->Add(nHSCP_TTbar);
-    hs_nHSCP->Add(nHSCP_WjetMuNu);
-    hs_nHSCP->Draw("HIST");
-    hs_nHSCP->SetMinimum(0.8);
-    hs_nHSCP->GetXaxis()->SetTitle("N_{HSCP}");
-    hs_nHSCP->GetYaxis()->SetTitle("Number of events");
-    nHSCP_MET->Draw("E1 same");
-
     TLegend *legend = new TLegend(0.7, 0.5, 0.85, 0.9);
-    legend->AddEntry(nHSCP_QCD, Label("qcd", "QCD muEnriched"), "f");
-    legend->AddEntry(nHSCP_TTbar, Label("ttbar", "TTbar"), "f");
-    legend->AddEntry(nHSCP_WjetMuNu, Label("wjets", "W+jets"), "f");
-    legend->AddEntry(nHSCP_MET, Label("data", "JetMET data"), "lep");
     legend->SetBorderSize(0);
     legend->SetFillStyle(0);
-    legend->Draw();
 
-    c_nHSCP->SetLogy();
+    // data on a stack of the backgrounds, for one histogram (the same name in every file)
+    auto drawStack = [&](TH1F *hData, const char *tag) {
+        if (!hData) Abort(Form("%s: a histogram is missing from the data file %s", tag, data));
+        TCanvas *c = new TCanvas(Form("c_%s", tag), Form("c_%s", tag), 800, 600);
+        THStack *hs = new THStack(Form("hs_%s", tag), "");
+        bool fillLegend = legend->GetListOfPrimitives()->GetSize() == 0;
+        for (auto &b : bkgs) {
+            TH1F *h = (TH1F*)b.f->Get(hData->GetName());
+            if (!h) Abort(Form("nHSCP: no %s in %s", hData->GetName(), b.path));
+            h->SetLineColor(b.color);
+            h->SetFillColorAlpha(b.color, 0.5);
+            hs->Add(h);
+            if (fillLegend) legend->AddEntry(h, Label(b.key, b.label), "f");
+        }
+        hData->SetLineColor(kBlack);
+        hData->SetMarkerColor(kBlack);
+        hData->SetMarkerStyle(20);
+        if (fillLegend) legend->AddEntry(hData, Label("data", "JetMET data"), "lep");
+        TH1 *frame = hData;
+        if (!bkgs.empty()) {
+            hs->Draw("HIST");
+            frame = hs->GetHistogram();
+            hs->SetMinimum(0.8);
+        }
+        else hData->SetMinimum(0.8);
+        frame->GetXaxis()->SetTitle("N_{HSCP}");
+        frame->GetYaxis()->SetTitle("Number of events");
+        hData->Draw(bkgs.empty() ? "E1" : "E1 same");
+        legend->Draw();
+        c->SetLogy();
+        return c;
+    };
 
-    c_nHSCP->SaveAs(OutPath("nHSCP_nosel.pdf"));
-
-    // same for the selected events
-    TCanvas *c_Sel_nHSCP = new TCanvas("c_Sel_nHSCP", "c_Sel_nHSCP", 800, 600);
-    THStack *hs_Sel_nHSCP = new THStack("hs_Sel_nHSCP", "");
-    Sel_nHSCP_QCD->SetLineColor(kGreen-4);
-    Sel_nHSCP_QCD->SetFillColorAlpha(kGreen-4, 0.5);
-    Sel_nHSCP_TTbar->SetLineColor(kRed);
-    Sel_nHSCP_TTbar->SetFillColorAlpha(kRed, 0.5);
-    Sel_nHSCP_WjetMuNu->SetLineColor(kBlue-7);
-    Sel_nHSCP_WjetMuNu->SetFillColorAlpha(kBlue-7, 0.5);
-    Sel_nHSCP_MET->SetLineColor(kBlack);
-    Sel_nHSCP_MET->SetMarkerColor(kBlack);
-    Sel_nHSCP_MET->SetMarkerStyle(20);
-
-    hs_Sel_nHSCP->Add(Sel_nHSCP_QCD);
-    hs_Sel_nHSCP->Add(Sel_nHSCP_TTbar);
-    hs_Sel_nHSCP->Add(Sel_nHSCP_WjetMuNu);
-    hs_Sel_nHSCP->Draw("HIST");
-    hs_Sel_nHSCP->SetMinimum(0.8);
-    hs_Sel_nHSCP->GetXaxis()->SetTitle("N_{HSCP}");
-    hs_Sel_nHSCP->GetYaxis()->SetTitle("Number of events");
-    Sel_nHSCP_MET->Draw("E1 same");
-
-    legend->Draw();
-    c_Sel_nHSCP->SetLogy();
-    c_Sel_nHSCP->SaveAs(OutPath("nHSCP_sel.pdf"));
-
+    drawStack(nHSCP_MET, "nHSCP")->SaveAs(OutPath("nHSCP_nosel.pdf"));
+    drawStack(Sel_nHSCP_MET, "Sel_nHSCP")->SaveAs(OutPath("nHSCP_sel.pdf"));
 
     return;
 }
@@ -3250,82 +3231,60 @@ void nPV(const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root
 
     gErrorIgnoreLevel = kError;
 
-    TFile *ifileQCD = new TFile(qcd, "READ");
-    TFile *ifileTTbar = new TFile(ttbar, "READ");
-    TFile *ifileWjetMuNu = new TFile(wjets, "READ");
+    // backgrounds in stacking order; an empty path leaves the sample out
+    struct Bkg { const char *path; const char *key; const char *label; int color; TFile *f; };
+    std::vector<Bkg> bkgs;
+    for (Bkg b : std::vector<Bkg>{{qcd, "qcd", "QCD muEnriched", kGreen-4, nullptr},
+                                  {ttbar, "ttbar", "TTbar", kRed, nullptr},
+                                  {wjets, "wjets", "W+jets", kBlue-7, nullptr}}) {
+        b.f = OpenOptional(b.path);
+        if (b.f) bkgs.push_back(b);
+        else std::cout << "nPV: " << b.key << " left out" << std::endl;
+    }
     TFile *ifileMET = new TFile(data, "READ");
 
-    TH1F *nPV_QCD = (TH1F*)ifileQCD->Get("nPVgood");
-    TH1F *nPV_TTbar = (TH1F*)ifileTTbar->Get("nPVgood");
-    TH1F *nPV_WjetMuNu = (TH1F*)ifileWjetMuNu->Get("nPVgood");
     TH1F *nPV_MET = (TH1F*)ifileMET->Get("nPVgood");
-
-    TH1F *Sel_nPV_QCD = (TH1F*)ifileQCD->Get("METanalysis_Eta2p4_nPVgood");
-    TH1F *Sel_nPV_TTbar = (TH1F*)ifileTTbar->Get("METanalysis_Eta2p4_nPVgood");
-    TH1F *Sel_nPV_WjetMuNu = (TH1F*)ifileWjetMuNu->Get("METanalysis_Eta2p4_nPVgood");
     TH1F *Sel_nPV_MET = (TH1F*)ifileMET->Get("METanalysis_Eta2p4_nPVgood");
 
-    // draw on the same canvas with a tstack for bkg
-    TCanvas *c_nPV = new TCanvas("c_nPV", "c_nPV", 800, 600);
-    THStack *hs_nPV = new THStack("hs_nPV", "");
-    nPV_QCD->SetLineColor(kGreen-4);
-    nPV_QCD->SetFillColorAlpha(kGreen-4, 0.5);
-    nPV_TTbar->SetLineColor(kRed);
-    nPV_TTbar->SetFillColorAlpha(kRed, 0.5);
-    nPV_WjetMuNu->SetLineColor(kBlue-7);
-    nPV_WjetMuNu->SetFillColorAlpha(kBlue-7, 0.5);
-    nPV_MET->SetLineColor(kBlack);
-    nPV_MET->SetMarkerColor(kBlack);
-    nPV_MET->SetMarkerStyle(20);
-
-    hs_nPV->Add(nPV_QCD);
-    hs_nPV->Add(nPV_TTbar);
-    hs_nPV->Add(nPV_WjetMuNu);
-    hs_nPV->Draw("HIST");
-    hs_nPV->SetMinimum(0.8);
-    hs_nPV->GetXaxis()->SetTitle("N_{PV}");
-    hs_nPV->GetYaxis()->SetTitle("Number of events");
-    nPV_MET->Draw("E1 same");
-
     TLegend *legend = new TLegend(0.7, 0.5, 0.85, 0.9);
-    legend->AddEntry(nPV_QCD, Label("qcd", "QCD muEnriched"), "f");
-    legend->AddEntry(nPV_TTbar, Label("ttbar", "TTbar"), "f");
-    legend->AddEntry(nPV_WjetMuNu, Label("wjets", "W+jets"), "f");
-    legend->AddEntry(nPV_MET, Label("data", "JetMET data"), "lep");
     legend->SetBorderSize(0);
     legend->SetFillStyle(0);
-    legend->Draw();
 
-    c_nPV->SetLogy();
+    // data on a stack of the backgrounds, for one histogram (the same name in every file)
+    auto drawStack = [&](TH1F *hData, const char *tag) {
+        if (!hData) Abort(Form("%s: a histogram is missing from the data file %s", tag, data));
+        TCanvas *c = new TCanvas(Form("c_%s", tag), Form("c_%s", tag), 800, 600);
+        THStack *hs = new THStack(Form("hs_%s", tag), "");
+        bool fillLegend = legend->GetListOfPrimitives()->GetSize() == 0;
+        for (auto &b : bkgs) {
+            TH1F *h = (TH1F*)b.f->Get(hData->GetName());
+            if (!h) Abort(Form("nPV: no %s in %s", hData->GetName(), b.path));
+            h->SetLineColor(b.color);
+            h->SetFillColorAlpha(b.color, 0.5);
+            hs->Add(h);
+            if (fillLegend) legend->AddEntry(h, Label(b.key, b.label), "f");
+        }
+        hData->SetLineColor(kBlack);
+        hData->SetMarkerColor(kBlack);
+        hData->SetMarkerStyle(20);
+        if (fillLegend) legend->AddEntry(hData, Label("data", "JetMET data"), "lep");
+        TH1 *frame = hData;
+        if (!bkgs.empty()) {
+            hs->Draw("HIST");
+            frame = hs->GetHistogram();
+            hs->SetMinimum(0.8);
+        }
+        else hData->SetMinimum(0.8);
+        frame->GetXaxis()->SetTitle("N_{PV}");
+        frame->GetYaxis()->SetTitle("Number of events");
+        hData->Draw(bkgs.empty() ? "E1" : "E1 same");
+        legend->Draw();
+        c->SetLogy();
+        return c;
+    };
 
-    c_nPV->SaveAs(OutPath("nPV_nosel.pdf"));
-
-    // same for the selected events
-    TCanvas *c_Sel_nPV = new TCanvas("c_Sel_nPV", "c_Sel_nPV", 800, 600);
-    THStack *hs_Sel_nPV = new THStack("hs_Sel_nPV", "");
-    Sel_nPV_QCD->SetLineColor(kGreen-4);
-    Sel_nPV_QCD->SetFillColorAlpha(kGreen-4, 0.5);
-    Sel_nPV_TTbar->SetLineColor(kRed);
-    Sel_nPV_TTbar->SetFillColorAlpha(kRed, 0.5);
-    Sel_nPV_WjetMuNu->SetLineColor(kBlue-7);
-    Sel_nPV_WjetMuNu->SetFillColorAlpha(kBlue-7, 0.5);
-    Sel_nPV_MET->SetLineColor(kBlack);
-    Sel_nPV_MET->SetMarkerColor(kBlack);
-    Sel_nPV_MET->SetMarkerStyle(20);
-
-    hs_Sel_nPV->Add(Sel_nPV_QCD);
-    hs_Sel_nPV->Add(Sel_nPV_TTbar);
-    hs_Sel_nPV->Add(Sel_nPV_WjetMuNu);
-    hs_Sel_nPV->Draw("HIST");
-    hs_Sel_nPV->SetMinimum(0.8);
-    hs_Sel_nPV->GetXaxis()->SetTitle("N_{PV}");
-    hs_Sel_nPV->GetYaxis()->SetTitle("Number of events");
-    Sel_nPV_MET->Draw("E1 same");
-
-    legend->Draw();
-    c_Sel_nPV->SetLogy();
-    c_Sel_nPV->SaveAs(OutPath("nPV_sel.pdf"));
-
+    drawStack(nPV_MET, "nPV")->SaveAs(OutPath("nPV_nosel.pdf"));
+    drawStack(Sel_nPV_MET, "Sel_nPV")->SaveAs(OutPath("nPV_sel.pdf"));
 
     return;
 }
@@ -3794,28 +3753,33 @@ void YieldAfterSF(bool isRescaled = true, bool isMuSelection = false, bool isMET
                   const char *dataMuonEG = "../output/MuonEG_V17/MuonEG2024_V17p4.root",
                   const char *gluino = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p1.root") {
 
-    TFile *ifileWmunu = new TFile(wjets, "READ");
-    TFile *ifileTTbar = new TFile(ttbar, "READ");
-    TFile *ifileDataMu = new TFile(dataMu, "READ");
-    TFile *ifileDataMET = new TFile(dataMET, "READ");
-    TFile *ifileDataMuonEG = new TFile(dataMuonEG, "READ");
-    TFile *ifileGluino = new TFile(gluino, "READ");
+    // only the files of the chosen selection are needed; the others may be empty paths
+    TFile *ifileWmunu = OpenOptional(wjets);
+    TFile *ifileTTbar = OpenOptional(ttbar);
+    TFile *ifileDataMu = OpenOptional(dataMu);
+    TFile *ifileDataMET = OpenOptional(dataMET);
+    TFile *ifileDataMuonEG = OpenOptional(dataMuonEG);
+    TFile *ifileGluino = OpenOptional(gluino);
+    auto need = [](TFile *f, const char *what) {
+        if (!f) Abort(Form("YieldAfterSF: this selection needs %s", what));
+        return f;
+    };
 
     TH1F *PostTrigger_PseudoCaloMET_SF_rescaled___MC, *PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA, *PostTrigger_PseudoCaloMET_SF_rescaled___Gluino;
     if (isMuSelection) {
-        PostTrigger_PseudoCaloMET_SF_rescaled___MC = (TH1F*)ifileWmunu->Get(Form("CalibPseudoMET_MuWay%s_if___orMETtrg___PseudoCaloMET", isRescaled ? "_isRescaled" : ""));
-        PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA = (TH1F*)ifileDataMu->Get("CalibPseudoMET_MuWay_if___orMETtrg___PseudoCaloMET"); // take the not rescaled one for data.
-        PostTrigger_PseudoCaloMET_SF_rescaled___Gluino = (TH1F*)ifileGluino->Get(Form("METanalysis_Eta2p4_PseudoCaloMET%s", isRescaled ? "_rescaled" : ""));
+        PostTrigger_PseudoCaloMET_SF_rescaled___MC = (TH1F*)need(ifileWmunu, "wjets")->Get(Form("CalibPseudoMET_MuWay%s_if___orMETtrg___PseudoCaloMET", isRescaled ? "_isRescaled" : ""));
+        PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA = (TH1F*)need(ifileDataMu, "dataMu")->Get("CalibPseudoMET_MuWay_if___orMETtrg___PseudoCaloMET"); // take the not rescaled one for data.
+        PostTrigger_PseudoCaloMET_SF_rescaled___Gluino = (TH1F*)need(ifileGluino, "gluino")->Get(Form("METanalysis_Eta2p4_PseudoCaloMET%s", isRescaled ? "_rescaled" : ""));
     }
     else if (isMETSelection) {
-        PostTrigger_PseudoCaloMET_SF_rescaled___MC = (TH1F*)ifileWmunu->Get(Form("Nm1_event_CaloMET%s", isRescaled ? "_weighted" : ""));
-        PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA = (TH1F*)ifileDataMET->Get("Nm1_event_CaloMET"); // take the not rescaled one for data.
-        PostTrigger_PseudoCaloMET_SF_rescaled___Gluino = (TH1F*)ifileGluino->Get(Form("Nm1_event_CaloMET%s", isRescaled ? "_rescaled" : ""));
+        PostTrigger_PseudoCaloMET_SF_rescaled___MC = (TH1F*)need(ifileWmunu, "wjets")->Get(Form("Nm1_event_CaloMET%s", isRescaled ? "_weighted" : ""));
+        PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA = (TH1F*)need(ifileDataMET, "dataMET")->Get("Nm1_event_CaloMET"); // take the not rescaled one for data.
+        PostTrigger_PseudoCaloMET_SF_rescaled___Gluino = (TH1F*)need(ifileGluino, "gluino")->Get(Form("Nm1_event_CaloMET%s", isRescaled ? "_rescaled" : ""));
     }
     else if (isTTbarSelection) {
-        PostTrigger_PseudoCaloMET_SF_rescaled___MC = (TH1F*)ifileTTbar->Get(Form("CalibPseudoMET%s_if___orMETtrg___PseudoCaloMET", isRescaled ? "_isRescaled" : ""));
-        PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA = (TH1F*)ifileDataMuonEG->Get("CalibPseudoMET_if___orMETtrg___PseudoCaloMET"); // take the not rescaled one for data.
-        PostTrigger_PseudoCaloMET_SF_rescaled___Gluino = (TH1F*)ifileGluino->Get(Form("METanalysis_Eta2p4_PseudoCaloMET%s", isRescaled ? "_rescaled" : ""));
+        PostTrigger_PseudoCaloMET_SF_rescaled___MC = (TH1F*)need(ifileTTbar, "ttbar")->Get(Form("CalibPseudoMET%s_if___orMETtrg___PseudoCaloMET", isRescaled ? "_isRescaled" : ""));
+        PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA = (TH1F*)need(ifileDataMuonEG, "dataMuonEG")->Get("CalibPseudoMET_if___orMETtrg___PseudoCaloMET"); // take the not rescaled one for data.
+        PostTrigger_PseudoCaloMET_SF_rescaled___Gluino = (TH1F*)need(ifileGluino, "gluino")->Get(Form("METanalysis_Eta2p4_PseudoCaloMET%s", isRescaled ? "_rescaled" : ""));
     }
 
 
@@ -4000,9 +3964,18 @@ void CompareKinematics(const char *data = "JetMET2024F_V12p313.root",
 
     TFile *ifile = new TFile(data, "READ");
 
-    TFile *ifileSig1400 = new TFile(gluino1400, "READ");
-    TFile *ifileSig2000 = new TFile(gluino2000, "READ");
-    TFile *ifileSig2600 = new TFile(gluino2600, "READ");
+    // HSCP-matched signal, one per mass slot; an empty path leaves the slot out
+    struct Signal { const char *path; const char *key; const char *label; const char *tag; TH2F *h; };
+    std::vector<Signal> signals;
+    for (Signal s : std::vector<Signal>{{gluino1400, "gluino1400", "m#scale[0.7]{#tilde{g}}=1400 GeV", "1400", nullptr},
+                                        {gluino2000, "gluino2000", "m#scale[0.7]{#tilde{g}}=2000 GeV", "2000", nullptr},
+                                        {gluino2600, "gluino2600", "m#scale[0.7]{#tilde{g}}=2600 GeV", "2600", nullptr}}) {
+        TFile *f = OpenOptional(s.path);
+        if (!f) { std::cout << "CompareKinematics: " << s.key << " left out" << std::endl; continue; }
+        s.h = (TH2F*)f->Get("trackPT_vs_trackPseudoTrackPT__HSCPmatched");
+        if (!s.h) Abort(Form("CompareKinematics: no trackPT_vs_trackPseudoTrackPT__HSCPmatched in %s", s.path));
+        signals.push_back(s);
+    }
 
     TH2F *trackPT_vs_trackPseudoTrackPT = (TH2F*)ifile->Get("trackPT_vs_trackPseudoTrackPT");
     TH2F *trackETA_vs_trackPseudoTrackETA = (TH2F*)ifile->Get("trackETA_vs_trackPseudoTrackETA");
@@ -4011,9 +3984,6 @@ void CompareKinematics(const char *data = "JetMET2024F_V12p313.root",
     TH2F *trackPT_vs_trackPseudoTrackPT__PFmuon = (TH2F*)ifile->Get("trackPT_vs_trackPseudoTrackPT__PFmuon");
     TH2F *trackPT_vs_trackPseudoTrackPT__PFpion = (TH2F*)ifile->Get("trackPT_vs_trackPseudoTrackPT__PFpion");
 
-    TH2F *trackPT_vs_trackPseudoTrackPT__HSCPmatched_1400 = (TH2F*)ifileSig1400->Get("trackPT_vs_trackPseudoTrackPT__HSCPmatched");
-    TH2F *trackPT_vs_trackPseudoTrackPT__HSCPmatched_2000 = (TH2F*)ifileSig2000->Get("trackPT_vs_trackPseudoTrackPT__HSCPmatched");
-    TH2F *trackPT_vs_trackPseudoTrackPT__HSCPmatched_2600 = (TH2F*)ifileSig2600->Get("trackPT_vs_trackPseudoTrackPT__HSCPmatched");
 
     trackPT_vs_trackPseudoTrackPT->GetXaxis()->SetTitle("PF p_{T} [GeV/c]");
     trackPT_vs_trackPseudoTrackPT->GetYaxis()->SetTitle("Track p_{T} [GeV/c]");
@@ -4077,9 +4047,7 @@ void CompareKinematics(const char *data = "JetMET2024F_V12p313.root",
 
     stylePT(trackPT_vs_trackPseudoTrackPT__PFmuon);
     stylePT(trackPT_vs_trackPseudoTrackPT__PFpion);
-    stylePT(trackPT_vs_trackPseudoTrackPT__HSCPmatched_1400);
-    stylePT(trackPT_vs_trackPseudoTrackPT__HSCPmatched_2000);
-    stylePT(trackPT_vs_trackPseudoTrackPT__HSCPmatched_2600);
+    for (auto &s : signals) stylePT(s.h);
 
     TLatex *tex = new TLatex(0.62, 0.91, Label("lumi", "109 fb^{-1} (13.6 TeV)"));
     tex->SetNDC();
@@ -4189,62 +4157,26 @@ void CompareKinematics(const char *data = "JetMET2024F_V12p313.root",
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Work in progress}");
 
 
-    // --- HSCP matched: gluino 1400 GeV ---
-    TCanvas *c6 = new TCanvas("c6", "c6", 800, 600);
-    c6->SetRightMargin(0.16);
-    c6->SetLeftMargin(0.16); c6->SetBottomMargin(0.16);
-    gStyle->SetOptStat(0);
-    gStyle->SetPalette(kViridis);
-    trackPT_vs_trackPseudoTrackPT__HSCPmatched_1400->Draw("COLZ");
-    c6->SetLogz();
-    latex1->Draw();
-    latexglu->SetTitle(Form("#bf{HSCP matched (%s)}", Label("gluino1400", "m#scale[0.7]{#tilde{g}}=1400 GeV")));
-    latexglu->SetX(0.53);
-    latexglu->Draw();
-    c6->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_1400.pdf"));
-    latex1->SetTitle("#it{Private work (CMS simulation)}");
-    c6->Modified();
-    c6->Update();
-    c6->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_1400_bis.pdf"));
-    latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Simulation Work in progress}");
-
-
-    // --- HSCP matched: gluino 2000 GeV ---
-    TCanvas *c7 = new TCanvas("c7", "c7", 800, 600);
-    c7->SetRightMargin(0.16);
-    c7->SetLeftMargin(0.16); c7->SetBottomMargin(0.16);
-    gStyle->SetOptStat(0);
-    gStyle->SetPalette(kViridis);
-    trackPT_vs_trackPseudoTrackPT__HSCPmatched_2000->Draw("COLZ");
-    c7->SetLogz();
-    latex1->Draw();
-    latexglu->SetTitle(Form("#bf{HSCP matched (%s)}", Label("gluino2000", "m#scale[0.7]{#tilde{g}}=2000 GeV")));
-    latexglu->Draw();
-    c7->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_2000.pdf"));
-    latex1->SetTitle("#it{Private work (CMS simulation)}");
-    c7->Modified();
-    c7->Update();
-    c7->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_2000_bis.pdf"));
-    latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Simulation Work in progress}");
-
-
-    // --- HSCP matched: gluino 2600 GeV ---
-    TCanvas *c8 = new TCanvas("c8", "c8", 800, 600);
-    c8->SetRightMargin(0.16);
-    c8->SetLeftMargin(0.16); c8->SetBottomMargin(0.16);
-    gStyle->SetOptStat(0);
-    gStyle->SetPalette(kViridis);
-    trackPT_vs_trackPseudoTrackPT__HSCPmatched_2600->Draw("COLZ");
-    c8->SetLogz();
-    latex1->Draw();
-    latexglu->SetTitle(Form("#bf{HSCP matched (%s)}", Label("gluino2600", "m#scale[0.7]{#tilde{g}}=2600 GeV")));
-    latexglu->Draw();
-    c8->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_2600.pdf"));
-    latex1->SetTitle("#it{Private work (CMS simulation)}");
-    c8->Modified();
-    c8->Update();
-    c8->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_2600_bis.pdf"));
-    latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Simulation Work in progress}");
+    // --- HSCP matched: one canvas per mass slot given ---
+    for (auto &s : signals) {
+        TCanvas *c = new TCanvas(Form("c_HSCPmatched_%s", s.tag), Form("c_HSCPmatched_%s", s.tag), 800, 600);
+        c->SetRightMargin(0.16);
+        c->SetLeftMargin(0.16); c->SetBottomMargin(0.16);
+        gStyle->SetOptStat(0);
+        gStyle->SetPalette(kViridis);
+        s.h->Draw("COLZ");
+        c->SetLogz();
+        latex1->Draw();
+        latexglu->SetTitle(Form("#bf{HSCP matched (%s)}", Label(s.key, s.label)));
+        latexglu->SetX(0.53);
+        latexglu->Draw();
+        c->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_%s.pdf", s.tag));
+        latex1->SetTitle("#it{Private work (CMS simulation)}");
+        c->Modified();
+        c->Update();
+        c->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_%s_bis.pdf", s.tag));
+        latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Simulation Work in progress}");
+    }
 
 
     return;
@@ -4414,30 +4346,41 @@ void FpixSlices(const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p11
                 const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root",
                 const char *gluino = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p3.root") {
 
-    TFile *fileWjets = new TFile(wjets, "READ");
-    TFile *fileTTbar = new TFile(ttbar, "READ");
-    TFile *fileQCD = new TFile(qcd, "READ");
+    // backgrounds: an empty path leaves the sample out of the MC sum
+    TFile *fileWjets = OpenOptional(wjets);
+    TFile *fileTTbar = OpenOptional(ttbar);
+    TFile *fileQCD = OpenOptional(qcd);
     TFile *fileSignal = new TFile(gluino, "READ");
     
     TH1F *FpixGluino_Eta1 = (TH1F*)fileSignal->Get("METanalysis_PseudoMETrescaled_Eta1_Fpix");
     TH1F *FpixGluino_Eta1_2p4 = (TH1F*)fileSignal->Get("METanalysis_PseudoMETrescaled_Eta1_2p4_Fpix");
     TH1F *FpixGluino_Eta2p4 = (TH1F*)fileSignal->Get("METanalysis_PseudoMETrescaled_Eta2p4_Fpix");
 
-    TH1F *FpixQCD_Eta1 = (TH1F*)fileQCD->Get("METanalysis_Eta1_Fpix");
-    TH1F *FpixQCD_Eta1_2p4 = (TH1F*)fileQCD->Get("METanalysis_Eta1_2p4_Fpix");
-    TH1F *FpixQCD_Eta2p4 = (TH1F*)fileQCD->Get("METanalysis_Eta2p4_Fpix");
+    // per background given: Fpix for |eta| < 1, 1 < |eta| < 2.4, |eta| < 2.4
+    std::vector<std::vector<TH1F*>> mc;
+    if (fileQCD) mc.push_back({(TH1F*)fileQCD->Get("METanalysis_Eta1_Fpix"),
+                               (TH1F*)fileQCD->Get("METanalysis_Eta1_2p4_Fpix"),
+                               (TH1F*)fileQCD->Get("METanalysis_Eta2p4_Fpix")});
+    if (fileTTbar) mc.push_back({(TH1F*)fileTTbar->Get("METanalysis_Eta1_Fpix"),
+                                 (TH1F*)fileTTbar->Get("METanalysis_Eta1_2p4_Fpix"),
+                                 (TH1F*)fileTTbar->Get("METanalysis_Eta2p4_Fpix")});
+    if (fileWjets) mc.push_back({(TH1F*)fileWjets->Get("METanalysis_PseudoMETrescaled_Eta1_Fpix"),
+                                 (TH1F*)fileWjets->Get("METanalysis_PseudoMETrescaled_Eta1_2p4_Fpix"),
+                                 (TH1F*)fileWjets->Get("METanalysis_PseudoMETrescaled_Eta2p4_Fpix")});
+    if (mc.empty()) Abort("FpixSlices: give at least one background");
+    for (auto &hs : mc)
+        for (TH1F *h : hs)
+            if (!h) Abort("FpixSlices: a background Fpix histogram is missing");
 
-    TH1F *FpixTTbar_Eta1 = (TH1F*)fileTTbar->Get("METanalysis_Eta1_Fpix");
-    TH1F *FpixTTbar_Eta1_2p4 = (TH1F*)fileTTbar->Get("METanalysis_Eta1_2p4_Fpix");
-    TH1F *FpixTTbar_Eta2p4 = (TH1F*)fileTTbar->Get("METanalysis_Eta2p4_Fpix");
-
-    TH1F *FpixWjets_Eta1 = (TH1F*)fileWjets->Get("METanalysis_PseudoMETrescaled_Eta1_Fpix");
-    TH1F *FpixWjets_Eta1_2p4 = (TH1F*)fileWjets->Get("METanalysis_PseudoMETrescaled_Eta1_2p4_Fpix");
-    TH1F *FpixWjets_Eta2p4 = (TH1F*)fileWjets->Get("METanalysis_PseudoMETrescaled_Eta2p4_Fpix");
-
-    FpixQCD_Eta1->Add(FpixTTbar_Eta1); FpixQCD_Eta1->Add(FpixWjets_Eta1);
-    FpixQCD_Eta1_2p4->Add(FpixTTbar_Eta1_2p4); FpixQCD_Eta1_2p4->Add(FpixWjets_Eta1_2p4);
-    FpixQCD_Eta2p4->Add(FpixTTbar_Eta2p4); FpixQCD_Eta2p4->Add(FpixWjets_Eta2p4); // QCD + TTbar + Wjets
+    // MC = sum of the backgrounds given (QCD + TTbar + Wjets)
+    TH1F *FpixQCD_Eta1 = (TH1F*)mc[0][0]->Clone("FpixMC_Eta1");
+    TH1F *FpixQCD_Eta1_2p4 = (TH1F*)mc[0][1]->Clone("FpixMC_Eta1_2p4");
+    TH1F *FpixQCD_Eta2p4 = (TH1F*)mc[0][2]->Clone("FpixMC_Eta2p4");
+    for (size_t k = 1; k < mc.size(); k++) {
+        FpixQCD_Eta1->Add(mc[k][0]);
+        FpixQCD_Eta1_2p4->Add(mc[k][1]);
+        FpixQCD_Eta2p4->Add(mc[k][2]);
+    }
     
 
     for (int i = 1; i <= 10; i++) {
@@ -4768,22 +4711,23 @@ void Acceptance_EtaSlice_DataMC(const char *data = "../output/JetMET2024_V12/Jet
                                 const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p6_weighted.root",
                                 const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root") {
 
-    TFile *fData = new TFile(data, "READ");
-
-    std::vector<TFile*> TFileMC = {
-        new TFile(wjets,  "READ"),
-        new TFile(ttbar,  "READ"),
-        new TFile(qcd,    "READ")
-    };
-
-
-    std::vector<TString> labels = {"Data", "W+jets", "t#bar{t}", "QCD"};
-
-    // Tous les fichiers dans un seul vecteur : data en premier
-    std::vector<TFile*> files = {fData};
-    for (auto f : TFileMC) files.push_back(f);
+    // data first, then the backgrounds given (an empty path leaves the sample out)
+    const char *paths[] = {data, wjets, ttbar, qcd};
+    const char *legKeys[] = {"data", "wjets", "ttbar", "qcd"};
+    const char *allLabels[] = {"Data", "W+jets", "t#bar{t}", "QCD"};
+    std::vector<TFile*> files;
+    std::vector<TString> labels;
+    std::vector<const char*> keys;
+    for (int k = 0; k < 4; k++) {
+        TFile *f = (k == 0) ? new TFile(paths[k], "READ") : OpenOptional(paths[k]);
+        if (!f) { std::cout << "Acceptance_EtaSlice_DataMC: " << legKeys[k] << " left out" << std::endl; continue; }
+        files.push_back(f);
+        labels.push_back(allLabels[k]);
+        keys.push_back(legKeys[k]);
+    }
 
     std::vector<TH1D*> h_accs;
+    std::vector<int> accIndex;       // index in files/labels/keys of each entry of h_accs
 
     TFile *ofile = new TFile(OutPath("Acceptance_EtaSlice_DataMC.root"), "RECREATE");
 
@@ -4829,6 +4773,7 @@ void Acceptance_EtaSlice_DataMC(const char *data = "../output/JetMET2024_V12/Jet
 
         h_acc->Write();
         h_accs.push_back(h_acc);
+        accIndex.push_back(i);
     }
 
     // --- Canvas récapitulatif ---
@@ -4866,8 +4811,7 @@ void Acceptance_EtaSlice_DataMC(const char *data = "../output/JetMET2024_V12/Jet
         h->GetYaxis()->SetLabelSize(0.05);
 
         h->Draw(i == 0 ? "PE" : "PE SAME");
-        const char *legKeys[] = {"data", "wjets", "ttbar", "qcd"};
-        leg->AddEntry(h, Label(legKeys[i], labels[i]), "lp");
+        leg->AddEntry(h, Label(keys[accIndex[i]], labels[accIndex[i]]), "lp");
     }
     leg->Draw();
 

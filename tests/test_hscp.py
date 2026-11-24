@@ -8,7 +8,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "python"))
-from hscp import config, driver, plots, proxy, selector, storage, weight  # noqa: E402
+from hscp import config, driver, plots, proxy, selector, stack, storage, weight  # noqa: E402
 
 
 class ConfigTests(unittest.TestCase):
@@ -533,11 +533,16 @@ void Y(bool a, int b, double c = 1, std::string d = "x,y", const char *e = "s") 
         self.assertEqual([p.name for p in c.select(["Y*"])], ["Y_MET"])
         with self.assertRaisesRegex(plots.PlotError, "no plot named zz"):
             c.select(["zz"])
+        # null: an empty path, the sample is left out
+        c = self.cfg(plots=[{"function": "nPV", "args": [None, "data"]}])
+        self.assertEqual(c.call(c.plots[0]), 'nPV("", "/repo/output/d.root")')
+        self.assertEqual(c.input_names(c.plots[0]), ["data"])
+        self.assertEqual(c.legend_labels(c.plots[0], plots.signature(self.MACRO, "nPV")), {})
 
     def test_config_errors(self):
         for change, msg in ((dict(plots=[{"function": "f", "args": ["nope"]}]), "'nope' is not an input"),
                             (dict(plots=[{"function": "f"}, {"function": "f"}]), "used twice: f"),
-                            (dict(plots=[]), "non-empty list"),
+                            (dict(plots="x"), "must be a list"),
                             (dict(plots=[{"function": "f", "args": [{"text": "x"}]}]), "literal string"),
                             (dict(plot=[]), "unknown key")):
             with self.assertRaisesRegex(plots.PlotError, msg, msg=change):
@@ -557,7 +562,7 @@ void Y(bool a, int b, double c = 1, std::string d = "x,y", const char *e = "s") 
         self.assertEqual(c.legend_labels(c.plots[1], y), {"e": 'g "1600"', "lumi": "7.98 fb^{-1}"})
         line = " ".join(plots.root_command(c, c.plots[1], c.legend_labels(c.plots[1], y)))
         self.assertIn('gLabels["e"] = "g \\"1600\\"";', line)
-        for bad in ({"data": {"label": "x"}}, {"data": {"file": "d", "color": 2}}, {"data": 3}):
+        for bad in ({"data": {"label": "x"}}, {"data": {"file": "d", "style": 2}}, {"data": {"file": "d", "color": 2.5}}, {"data": 3}):
             with self.assertRaisesRegex(plots.PlotError, "must be a path", msg=bad):
                 self.cfg(inputs=dict(self.DOC["inputs"], **bad))
 
@@ -603,6 +608,16 @@ void Y(bool a, int b, double c = 1, std::string d = "x,y", const char *e = "s") 
         self.assertEqual(plots.check_calls(c, c.plots, macro), [])
         self.assertIn("TString OutPath(const char *fmt, ...)", macro)
         self.assertIn("const char *Label(const char *key, const char *fallback)", macro)
+        self.assertIn("TFile *OpenOptional(const char *path)", macro)
+        # the optional inputs are opened with OpenOptional, so that null (an empty path) leaves them out
+        for name, params in (("Cutflows", ["QCD", "TTbar", "TTbarSemiLep", "Wjets"]), ("nPV", ["qcd", "ttbar", "wjets"]),
+                             ("nHSCP", ["qcd", "ttbar", "wjets"]), ("FpixelPlot", ["wjets"]),
+                             ("FpixSlices", ["wjets", "ttbar", "qcd"]), ("CompareMaping", ["ttbar", "wjets", "qcd"]),
+                             ("CompareKinematics", ["gluino1400", "gluino2000", "gluino2600"])):
+            body = plots.function_body(macro, name)
+            self.assertIn("OpenOptional(", body, name)
+            for p in params:
+                self.assertNotIn(f"new TFile({p},", body, f"{name}: {p}")
         # every label key of a converted function, Label("key", ...) or legKeys, is one of its parameters or "lumi"
         import re
         for name in ("Cutflows", "nPV", "nHSCP", "FpixelPlot", "Acceptance_EtaSlice_DataMC", "CompareKinematics",
@@ -623,6 +638,63 @@ void Y(bool a, int b, double c = 1, std::string d = "x,y", const char *e = "s") 
             body = body[:body.index("\nvoid ", 10)]
             live = [l for l in body.splitlines() if "../outputDisplay" in l and not l.strip().startswith("//")]
             self.assertEqual(live, [], name)
+
+
+
+class StackTests(unittest.TestCase):
+    DOC = {"inputs": {"data": {"file": "d.root", "label": "Data"}, "qcd": {"file": "q.root", "color": "kGreen-4"},
+                      "tt": {"file": "t.root", "color": 4}, "sig": {"file": "s.root", "label": "g 1600"},
+                      "pattern": "S_%d.root"},
+           "stack": {"data": "data", "backgrounds": ["qcd", "tt"], "signals": ["sig"]}}
+
+    def cfg(self, **change):
+        return plots.PlotConfig(dict(self.DOC, **change), "t.json", base="/repo")
+
+    def test_config(self):
+        c = self.cfg()
+        self.assertEqual(c.plots, [])                               # "plots" may be absent
+        self.assertEqual(c.colors, {"qcd": "kGreen-4", "tt": 4})
+        self.assertEqual(c.stack, {"data": "data", "backgrounds": ["qcd", "tt"], "signals": ["sig"]})
+        for bad, msg in (({"backgrounds": ["nope"]}, "'nope' is not an input"), ({"data": 3}, "input name or null"),
+                         ({"backgrounds": "qcd"}, "list of input names"), ({"other": []}, "expected")):
+            with self.assertRaisesRegex(plots.PlotError, msg, msg=bad):
+                self.cfg(stack=bad)
+
+    def test_samples(self):
+        c = self.cfg()
+        self.assertEqual(stack.samples(c), stack.Samples("data", ["qcd", "tt"], ["sig"]))
+        # the command line wins: '' for no data, lists for the others
+        self.assertEqual(stack.samples(c, data="", backgrounds=["tt"]), stack.Samples(None, ["tt"], ["sig"]))
+        self.assertEqual(stack.split_names(" qcd, tt ,"), ["qcd", "tt"])
+        self.assertIsNone(stack.split_names(None))
+        for kw, msg in ((dict(backgrounds=["nope"]), "not an input"), (dict(signals=["pattern"]), "pattern"),
+                        (dict(backgrounds=["qcd", "qcd"]), "given twice")):
+            with self.assertRaisesRegex(plots.PlotError, msg, msg=kw):
+                stack.samples(c, **kw)
+        with self.assertRaisesRegex(plots.PlotError, "no sample"):
+            stack.samples(self.cfg(stack=None))
+
+    def test_helpers(self):
+        keys = ["A_Fpix", "A_eta", "B_Fpix", "EventCutflow"]
+        self.assertEqual(stack.expand(["*_Fpix", "EventCutflow"], keys), ["A_Fpix", "B_Fpix", "EventCutflow"])
+        with self.assertRaisesRegex(plots.PlotError, "no histogram named C_\\*"):
+            stack.expand(["A_*", "C_*"], keys)
+        self.assertEqual(stack.parse_color("kRed+2"), ("kRed", 2))
+        self.assertEqual(stack.parse_color("kGreen - 4"), ("kGreen", -4))
+        self.assertEqual(stack.parse_color(" kBlack"), ("kBlack", 0))
+        self.assertEqual(stack.parse_color(7), 7)
+        with self.assertRaises(plots.PlotError):
+            stack.parse_color("red")
+        cols = stack.colors(self.cfg(), ["qcd", "tt", "x", "y"], ["kBlue", "kRed"])
+        self.assertEqual(cols, {"qcd": ("kGreen", -4), "tt": 4, "x": ("kBlue", 0), "y": ("kRed", 0)})
+        self.assertEqual(stack.file_name("a/b c*d"), "a_b_c_d")
+        self.assertEqual(stack.legend_label(self.cfg(), "sig", 100), "g 1600 #times 100")
+        self.assertEqual(stack.legend_label(self.cfg(), "qcd"), "qcd")
+
+    def test_repository_stack_block(self):
+        c = plots.load()
+        if c.stack:
+            stack.samples(c)                                         # names are inputs, no pattern
 
 
 if __name__ == "__main__":

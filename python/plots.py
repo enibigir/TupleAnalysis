@@ -63,7 +63,8 @@ def describe(rc, log):
     if crash:
         return f"crashed ({crash}), often a histogram missing from an input file"
     return {2: "exit code 2: the macro does not load",
-            3: "exit code 3: the call does not compile (function name or arguments)"}.get(rc) or driver.describe_exit(rc)
+            3: "exit code 3: the call does not compile (function name or arguments)",
+            4: "exit code 4: an input is missing or unusable, see the ERROR line of the log"}.get(rc) or driver.describe_exit(rc)
 
 
 def missing_histograms(cfg, plot, names, ROOT):
@@ -103,7 +104,7 @@ def main(argv=None):
     if args.list:
         for p in chosen:
             missing = dict(cfg.missing_inputs(p))
-            shown = ", ".join(a if isinstance(a, str) else cfg.cpp_arg(a) for a in p.args)
+            shown = ", ".join(a if isinstance(a, str) else "null" if a is None else cfg.cpp_arg(a) for a in p.args)
             print(f"{p.name}  ->  {p.function}({shown})")
             for n in dict.fromkeys(cfg.input_names(p)):
                 print(f"    {n:<18} {cfg.inputs[n]}" + ("   MISSING" if n in missing else "")

@@ -16,13 +16,19 @@ cfg/plots.json:
 
 Paths (inputs, output_dir, macro) are relative to the repository unless absolute; an input may hold %d
 (a pattern the function fills with a mass), and exists if one file matches. In "args", a string is the
-name of an input, true/false and numbers are passed as they are, and {"str": "text"} is a literal string.
+name of an input, true/false and numbers are passed as they are, {"str": "text"} is a literal string, and
+null an empty path: the sample is left out (backgrounds, gluino mass slots; see the functions of the macro).
 A plot is named after its function unless "name" is given; names must be unique. "note" is free text.
 
-Labels: an input is a path, or {"file": path, "label": text} to set its legend entry (ROOT TLatex, e.g.
-"#tilde{g} (m=1600 GeV)"); "lumi_label" sets the luminosity text. A label goes to the macro under the name
+Labels: an input is a path, or {"file": path, "label": text, "color": c} to set its legend entry (ROOT
+TLatex, e.g. "#tilde{g} (m=1600 GeV)") and its colour in python/stack.py (a ROOT colour number, or a name
+such as "kRed+2"); "lumi_label" sets the luminosity text. A label goes to the macro under the name
 of the function parameter that receives the input (Label("qcd", ...) in macros/CombineHistos.C); legends
 without a configured label keep the text written in the macro.
+
+"stack" (optional) gives the samples of python/stack.py, by input name:
+    "stack": {"data": "data", "backgrounds": ["qcd", "ttbar", "wjets"], "signals": ["gluino"]}
+backgrounds in stacking order (the first at the bottom); "data": null for none. "plots" may be empty.
 """
 
 import glob
@@ -49,7 +55,7 @@ class PlotConfig:
     def __init__(self, doc, source="plots.json", base=config.REPO):
         if not isinstance(doc, dict):
             raise PlotError(f"{source}: expected a JSON object")
-        unknown = set(doc) - {"output_dir", "inputs", "plots", "macro", "lumi_label", "_comment"}
+        unknown = set(doc) - {"output_dir", "inputs", "plots", "macro", "lumi_label", "stack", "_comment"}
         if unknown:
             raise PlotError(f"{source}: unknown key(s) {', '.join(sorted(unknown))}")
         self.source, self.base = source, base
@@ -58,24 +64,28 @@ class PlotConfig:
         inputs = doc.get("inputs", {})
         if not isinstance(inputs, dict):
             raise PlotError(f"{source}: 'inputs' must map names to file paths")
-        self.inputs, self.labels = {}, {}
+        self.inputs, self.labels, self.colors = {}, {}, {}
         for k, v in inputs.items():
-            if isinstance(v, dict) and set(v) <= {"file", "label"} and isinstance(v.get("file"), str) and v["file"] \
-                    and isinstance(v.get("label", ""), str):
-                file, label = v["file"], v.get("label")
+            if isinstance(v, dict) and set(v) <= {"file", "label", "color"} and isinstance(v.get("file"), str) \
+                    and v["file"] and isinstance(v.get("label", ""), str) \
+                    and (isinstance(v.get("color", ""), str) or type(v.get("color")) is int):
+                file, label, color = v["file"], v.get("label"), v.get("color")
             elif isinstance(v, str) and v:
-                file, label = v, None
+                file, label, color = v, None, None
             else:
-                raise PlotError(f'{source}: input {k} must be a path or {{"file": path, "label": text}}')
+                raise PlotError(f'{source}: input {k} must be a path or {{"file": path, "label": text, "color": c}}')
             self.inputs[k] = self.path(file)
             if label:
                 self.labels[k] = label
+            if color is not None and color != "":
+                self.colors[k] = color
         self.lumi_label = doc.get("lumi_label")
         if self.lumi_label is not None and not isinstance(self.lumi_label, str):
             raise PlotError(f"{source}: 'lumi_label' must be a string")
-        plots = doc.get("plots")
-        if not isinstance(plots, list) or not plots:
-            raise PlotError(f"{source}: 'plots' must be a non-empty list")
+        self.stack = self._read_stack(doc.get("stack"))
+        plots = doc.get("plots", [])
+        if not isinstance(plots, list):
+            raise PlotError(f"{source}: 'plots' must be a list")
         self.plots = []
         for i, p in enumerate(plots):
             where = f"{source}: plots[{i}]"
@@ -95,6 +105,23 @@ class PlotConfig:
         if dup:
             raise PlotError(f"{source}: plot name(s) used twice: {', '.join(dup)} (give a 'name' to each)")
 
+    def _read_stack(self, s):
+        if s is None:
+            return None
+        where = f"{self.source}: stack"
+        if not isinstance(s, dict) or set(s) - {"data", "backgrounds", "signals"}:
+            raise PlotError(f'{where}: expected {{"data": name, "backgrounds": [names], "signals": [names]}}')
+        data, bkgs, sigs = s.get("data"), s.get("backgrounds", []), s.get("signals", [])
+        if data is not None and not isinstance(data, str):
+            raise PlotError(f"{where}: 'data' must be an input name or null")
+        for key, value in (("backgrounds", bkgs), ("signals", sigs)):
+            if not isinstance(value, list) or not all(isinstance(n, str) for n in value):
+                raise PlotError(f"{where}: '{key}' must be a list of input names")
+        for n in ([data] if data else []) + bkgs + sigs:
+            if n not in self.inputs:
+                raise PlotError(f"{where}: '{n}' is not an input (inputs: {', '.join(sorted(self.inputs))})")
+        return {"data": data, "backgrounds": bkgs, "signals": sigs}
+
     def path(self, p):
         return p if os.path.isabs(p) else os.path.normpath(os.path.join(self.base, p))
 
@@ -106,7 +133,7 @@ class PlotConfig:
         elif isinstance(a, dict):
             if set(a) != {"str"} or not isinstance(a["str"], str):
                 raise PlotError(f'{where}: a literal string is written {{"str": "..."}}, not {a}')
-        elif not isinstance(a, (bool, int, float)):
+        elif a is not None and not isinstance(a, (bool, int, float)):
             raise PlotError(f"{where}: unsupported argument {a!r}")
 
     def select(self, patterns):
@@ -143,6 +170,8 @@ class PlotConfig:
         return out
 
     def cpp_arg(self, a):
+        if a is None:
+            return '""'
         if isinstance(a, bool):
             return "true" if a else "false"
         if isinstance(a, (int, float)):
