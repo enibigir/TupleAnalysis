@@ -93,17 +93,20 @@ class Drawer:
         if not drawn:
             return None
 
-        total = None
-        hs = R.THStack(f"hs_{name}", "")
+        # the stack as cumulative sums (background k on top of 0..k-1), drawn tallest first: the same picture as
+        # a THStack, which crashes in THStack::BuildAndPaint with several histograms in some ROOT versions (6.40)
+        total, cumulative = None, []
         for n, h in bkgs:
             h.SetFillColor(self.bkg_colors[n])
             h.SetLineColor(self.bkg_colors[n])
-            hs.Add(h)
-            if total is None:
-                total = h.Clone(f"{name}__total")
-                total.SetDirectory(0)
-            else:
+            total = h.Clone(f"{name}__cum_{n}") if total is None else total.Clone(f"{name}__cum_{n}")
+            if len(cumulative):
                 total.Add(h)
+            total.SetDirectory(0)
+            total.SetFillColor(self.bkg_colors[n])
+            total.SetLineColor(self.bkg_colors[n])
+            cumulative.append(total)
+        self.keep += cumulative
         for n, h in sigs:
             if a.signal_scale != 1:
                 h.Scale(a.signal_scale)
@@ -115,7 +118,6 @@ class Drawer:
             data.SetMarkerSize(0.9)
             data.SetLineColor(R.kBlack)
             data.SetMarkerColor(R.kBlack)
-        self.keep += [hs] + ([total] if total else [])
 
         ratio = not a.no_ratio and data is not None and total is not None
         c = R.TCanvas(f"c_{name}", "", 800, 800 if ratio else 650)
@@ -154,7 +156,7 @@ class Drawer:
         hmax = max(tops) if tops else 1.0
         if a.logy:
             ymin = a.ymin if a.ymin is not None else (0.5 * min(positive) if positive else 0.1)
-            ymax = a.ymax if a.ymax is not None else (ymin * (hmax / ymin) ** 1.4 if hmax > ymin else 10 * ymin)
+            ymax = a.ymax if a.ymax is not None else (ymin * (hmax / ymin) ** 1.8 if hmax > ymin else 10 * ymin)
         else:
             ymin = a.ymin if a.ymin is not None else 0.0
             ymax = a.ymax if a.ymax is not None else 1.45 * hmax
@@ -177,7 +179,8 @@ class Drawer:
             frame.GetXaxis().SetLabelSize(0.04)
         frame.Draw("AXIS")
         if bkgs:
-            hs.Draw("HIST SAME")
+            for h in reversed(cumulative):                  # the full sum first, then the lower layers
+                h.Draw("HIST SAME")
             band = total.Clone(f"{name}__band")
             band.SetDirectory(0)
             band.SetFillStyle(3354)

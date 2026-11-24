@@ -7,6 +7,7 @@ Run the selector on samples, locally.
     ./launch.sh --list '*'                         # all samples: type, dataset, binning
     ./launch.sh 'Gluino_Run3_MET_madgraph_*' --jobs 3 --out-dir output/gluino
     ./launch.sh TestJetMET2024C --dry-run
+    ./launch.sh 'QCD2024_mu_pt*' --max-files 2 --out-dir output/quick     # 2 files per sample
 
 Samples are selected by fnmatch patterns against the names of cfg/datasets.json, or by
 dataset (a group of samples, e.g. JetMET2024 for the eras C to I). Their ntuples and binning
@@ -40,12 +41,17 @@ def parse_args(argv):
     ap.add_argument("--jobs", type=int, default=1, help="samples run at the same time (each with 1 thread)")
     ap.add_argument("--threads", type=int, help="implicit-MT threads per sample (default: 1 if --jobs > 1, else ROOT's 4)")
     ap.add_argument("--keep-going", action="store_true", help="continue with the next sample after a failure")
+    ap.add_argument("--max-files", type=int, metavar="N",
+                    help="only the first N files of each sample (a quick look, a tutorial); the weights stay right, "
+                         "since the sum of weights counts the events read")
     ap.add_argument("--selections", default=config.SELECTIONS_FILE, help="selection file (default: cfg/selections.json)")
     ap.add_argument("--prod-dir", help="production directory (default: $HSCP_PROD_DIR, else prod_dir of datasets.json)")
     ap.add_argument("--keep-build", action="store_true", help="keep the compiled selector (HSCPSelector_C*) afterwards")
     args = ap.parse_args(argv)
     if not args.patterns and not args.dataset:
         ap.error("give at least one sample name, pattern or --dataset (try: --list '*')")
+    if args.max_files is not None and args.max_files < 1:
+        ap.error("--max-files must be at least 1")
     return args
 
 
@@ -66,7 +72,7 @@ def main(argv=None):
     files = {}
     for n in names:                                    # fail before compiling anything
         try:
-            files[n] = cfg.files(n)
+            files[n] = cfg.files(n)[:args.max_files] if args.max_files else cfg.files(n)
         except config.ConfigError as e:
             sys.exit(f"launch: {e}")
 
