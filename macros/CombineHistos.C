@@ -13,6 +13,35 @@
 #include <fstream>
 #include <cmath>
 #include <TPaveText.h>
+#include <TSystem.h>
+#include <cstdarg>
+#include <map>
+#include <string>
+
+// Output directory of the plots, relative to macros/ (the working directory) or absolute.
+// python/plots.py sets it from "output_dir" of cfg/plots.json; the default keeps the old place.
+TString gOutDir = "../outputDisplay";
+
+// Legend labels set by python/plots.py from cfg/plots.json, by parameter name of the function ("qcd",
+// "gluino", ...) and "lumi"; Label(key, text) gives the configured label, else the text written here.
+std::map<std::string, std::string> gLabels;
+
+const char *Label(const char *key, const char *fallback) {
+    auto it = gLabels.find(key);
+    return it != gLabels.end() ? it->second.c_str() : fallback;
+}
+
+// gOutDir/<name>, name given printf-style; the parent directory is created if needed.
+TString OutPath(const char *fmt, ...) {
+    char name[1024];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(name, sizeof(name), fmt, ap);
+    va_end(ap);
+    TString path = gOutDir + "/" + name;
+    gSystem->mkdir(gSystem->GetDirName(path), kTRUE);
+    return path;
+}
 
 TH1* rebinHisto(TH1* h) {
     double xbins[36]={0.,20.,40.,60.,80.,100.,120.,140.,160.,180.,200.,220.,240.,260.,280.,300.,320.,340.,360.,380.,410.,440.,480.,530.,590.,660.,760.,880.,1030.,1210.,1440.,1730.,2000.,2500.,3200.,4000.};
@@ -1411,7 +1440,7 @@ void Cutflows(std::string QCD,
               std::string JetMETdata,
               std::string Gluino2000) {
 
-    TFile *ofile = new TFile("../outputDisplay/EventCutflow.root", "RECREATE");
+    TFile *ofile = new TFile(OutPath("EventCutflow.root"), "RECREATE");
 
     TFile *ifile_QCD = new TFile(QCD.c_str(), "READ");
     TFile *ifile_TTbar = new TFile(TTbar.c_str(), "READ");
@@ -1474,7 +1503,7 @@ void Cutflows(std::string QCD,
     Cutflow_JetMETdata->SetMarkerColor(colorJetMET);
     Cutflow_JetMETdata->SetMarkerStyle(20);
 
-    TLatex *tex = new TLatex(0.68, 0.91, "109 fb^{-1} (13.6 TeV)");
+    TLatex *tex = new TLatex(0.68, 0.91, Label("lumi", "109 fb^{-1} (13.6 TeV)"));
     tex->SetNDC();
     tex->SetTextFont(42);
     tex->SetTextSize(0.04);
@@ -1506,12 +1535,12 @@ void Cutflows(std::string QCD,
     TLegend* leg = new TLegend(0.50, 0.72, 0.89, 0.89);
     leg->SetBorderSize(0);
     leg->SetNColumns(2);
-    leg->AddEntry(Cutflow_JetMETdata, "MET data","lep");
-    leg->AddEntry(Cutflow_Wjets, "W(#rightarrow#mu#nu)+jets", "f");
-    leg->AddEntry(Cutflow_TTbar, "t#bar{t}#rightarrow2l2#nu", "f");
-    leg->AddEntry(Cutflow_TTbarSemiLep, "t#bar{t}#rightarrowl#nu", "f");
-    leg->AddEntry(Cutflow_QCD, "QCD (#mu enriched)",       "f");
-    leg->AddEntry(Cutflow_Gluino2000, "#tilde{g} (m=2000 GeV) x100", "ep");
+    leg->AddEntry(Cutflow_JetMETdata, Label("JetMETdata", "MET data"),"lep");
+    leg->AddEntry(Cutflow_Wjets, Label("Wjets", "W(#rightarrow#mu#nu)+jets"), "f");
+    leg->AddEntry(Cutflow_TTbar, Label("TTbar", "t#bar{t}#rightarrow2l2#nu"), "f");
+    leg->AddEntry(Cutflow_TTbarSemiLep, Label("TTbarSemiLep", "t#bar{t}#rightarrowl#nu"), "f");
+    leg->AddEntry(Cutflow_QCD, Label("QCD", "QCD (#mu enriched)"), "f");
+    leg->AddEntry(Cutflow_Gluino2000, Form("%s x100", Label("Gluino2000", "#tilde{g} (m=2000 GeV)")), "ep");
     leg->Draw();
 
     // --- Label CMS
@@ -1561,7 +1590,7 @@ void Cutflows(std::string QCD,
     // --- Saving
     ofile->cd();
     c->Write();
-    c->SaveAs("../outputDisplay/Nm1plots/EventCutflow.pdf");
+    c->SaveAs(OutPath("Nm1plots/EventCutflow.pdf"));
     ofile->Close();
 }
 
@@ -2648,14 +2677,17 @@ void GluinoP_mass(bool isPythia, bool isWeighted) {
 
 }
 
-void CompareMaping() {
+void CompareMaping(const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p9_weighted.root",
+                   const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p13_weighted.root",
+                   const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p2_weighted.root",
+                   const char *gluino = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p8_weighted.root") {
 
-    TFile *ofile = new TFile("../outputDisplay/CompareMapping.root", "RECREATE");
+    TFile *ofile = new TFile(OutPath("CompareMapping.root"), "RECREATE");
 
-    TFile *ifileTTbar2024 = new TFile("../output/TTbar2024_V15/TTbar2024_V15p9_weighted.root", "READ");
-    TFile *ifileWjets2024 = new TFile("../output/Wjets2024_V14/WjetMuNu2024_V14p13_weighted.root", "READ");
-    TFile *ifileQCD2024 = new TFile("../output/QCD2024_V16/QCD2024_mu_V16p2_weighted.root", "READ");
-    TFile *GluinoRun3madgraph = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p8_weighted.root", "READ");
+    TFile *ifileTTbar2024 = new TFile(ttbar, "READ");
+    TFile *ifileWjets2024 = new TFile(wjets, "READ");
+    TFile *ifileQCD2024 = new TFile(qcd, "READ");
+    TFile *GluinoRun3madgraph = new TFile(gluino, "READ");
 
     TLatex *latex1 = new TLatex(0.155, 0.91, "#it{Private work (CMS simulation)}");
     latex1->SetNDC();
@@ -2812,7 +2844,7 @@ void CompareMaping() {
         cout << "Number of entries with Fpixel <= " << fpix_cut << ": " << nEntries_bkg << " (bkg), " << nEntries_gluino << " (gluino)" << "    (" << 100.0*nEntries_gluino/nEntries_bkg << " %)" << endl;
     }
     gStyle->SetOptStat(0);
-    c_bkg_gluino->SaveAs("../outputDisplay/CompareMaping_prout.pdf");
+    c_bkg_gluino->SaveAs(OutPath("CompareMaping_prout.pdf"));
 
 
     ofile->cd();
@@ -2824,13 +2856,15 @@ void CompareMaping() {
     return;
 }
 
-void FpixelPlot() {
+void FpixelPlot(const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p11_weighted.root",
+                const char *data = "../output/JetMET2024_V12/JetMET2024_V12p24.root",
+                const char *gluino = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p1.root") {
 
-    TFile *ofile = new TFile("../outputDisplay/Nm1_plots.root", "RECREATE");
+    TFile *ofile = new TFile(OutPath("Nm1_plots.root"), "RECREATE");
 
-    TFile *fileWjets = new TFile("../output/Wjets2024_V14/WjetMuNu2024_V14p11_weighted.root", "READ");
-    TFile *ifile_JetMETdata = new TFile("../output/JetMET2024_V12/JetMET2024_V12p24.root", "READ");
-    TFile *ifile_Gluino = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p1.root", "READ");
+    TFile *fileWjets = new TFile(wjets, "READ");
+    TFile *ifile_JetMETdata = new TFile(data, "READ");
+    TFile *ifile_Gluino = new TFile(gluino, "READ");
 
 
     TH1F *fpix_JetMETdata = (TH1F*)ifile_JetMETdata->Get("Nosel_Fpix");
@@ -2885,8 +2919,8 @@ void FpixelPlot() {
     //fpix_JetMETdata->Draw("E1 same");
     TLegend *legend_fpix = new TLegend(0.2, 0.5, 0.5, 0.7);
     //legend_fpix->AddEntry(fpix_JetMETdata, "JetMET 2024 data", "lep");
-    legend_fpix->AddEntry(fpix_Wjets, "MC Wjet 2024", "lep");
-    legend_fpix->AddEntry(fpix_Gluino, "#tilde{g}_{m=2000 GeV}", "f");
+    legend_fpix->AddEntry(fpix_Wjets, Label("wjets", "MC Wjet 2024"), "lep");
+    legend_fpix->AddEntry(fpix_Gluino, Label("gluino", "#tilde{g}_{m=2000 GeV}"), "f");
     legend_fpix->SetBorderSize(0);
     legend_fpix->SetFillStyle(0);
     legend_fpix->Draw();
@@ -2901,7 +2935,7 @@ void FpixelPlot() {
     latex1->Draw();
     //latex1->SetTitle("#it{Private work (CMS simulation)}");
 
-    c_fpix->SaveAs("../outputDisplay/Fpixel_plot.pdf");
+    c_fpix->SaveAs(OutPath("Fpixel_plot.pdf"));
 }
 
 
@@ -3122,14 +3156,17 @@ void DrawPseudoMET(bool OTHERrescale = false) {
     return;
 }
 
-void nHSCP() {
+void nHSCP(const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root",
+           const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p6_weighted.root",
+           const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p8_weighted.root",
+           const char *data = "../output/JetMET2024_V12/JetMET2024_V12p24.root") {
 
     gErrorIgnoreLevel = kError;
 
-    TFile *ifileQCD = new TFile("../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root", "READ");
-    TFile *ifileTTbar = new TFile("../output/TTbar2024_V15/TTbar2024_V15p6_weighted.root", "READ");
-    TFile *ifileWjetMuNu = new TFile("../output/Wjets2024_V14/WjetMuNu2024_V14p8_weighted.root", "READ");
-    TFile *ifileMET = new TFile("../output/JetMET2024_V12/JetMET2024_V12p24.root", "READ");
+    TFile *ifileQCD = new TFile(qcd, "READ");
+    TFile *ifileTTbar = new TFile(ttbar, "READ");
+    TFile *ifileWjetMuNu = new TFile(wjets, "READ");
+    TFile *ifileMET = new TFile(data, "READ");
 
     TH1F *nHSCP_QCD = (TH1F*)ifileQCD->Get("nHSCP");
     TH1F *nHSCP_TTbar = (TH1F*)ifileTTbar->Get("nHSCP");
@@ -3164,17 +3201,17 @@ void nHSCP() {
     nHSCP_MET->Draw("E1 same");
 
     TLegend *legend = new TLegend(0.7, 0.5, 0.85, 0.9);
-    legend->AddEntry(nHSCP_QCD, "QCD muEnriched", "f");
-    legend->AddEntry(nHSCP_TTbar, "TTbar", "f");
-    legend->AddEntry(nHSCP_WjetMuNu, "W+jets", "f");
-    legend->AddEntry(nHSCP_MET, "JetMET data", "lep");
+    legend->AddEntry(nHSCP_QCD, Label("qcd", "QCD muEnriched"), "f");
+    legend->AddEntry(nHSCP_TTbar, Label("ttbar", "TTbar"), "f");
+    legend->AddEntry(nHSCP_WjetMuNu, Label("wjets", "W+jets"), "f");
+    legend->AddEntry(nHSCP_MET, Label("data", "JetMET data"), "lep");
     legend->SetBorderSize(0);
     legend->SetFillStyle(0);
     legend->Draw();
 
     c_nHSCP->SetLogy();
 
-    c_nHSCP->SaveAs("../outputDisplay/nHSCP_nosel.pdf");
+    c_nHSCP->SaveAs(OutPath("nHSCP_nosel.pdf"));
 
     // same for the selected events
     TCanvas *c_Sel_nHSCP = new TCanvas("c_Sel_nHSCP", "c_Sel_nHSCP", 800, 600);
@@ -3200,20 +3237,23 @@ void nHSCP() {
 
     legend->Draw();
     c_Sel_nHSCP->SetLogy();
-    c_Sel_nHSCP->SaveAs("../outputDisplay/nHSCP_sel.pdf");
+    c_Sel_nHSCP->SaveAs(OutPath("nHSCP_sel.pdf"));
 
 
     return;
 }
 
-void nPV() {
+void nPV(const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root",
+         const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p6_weighted.root",
+         const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p8_weighted.root",
+         const char *data = "../output/JetMET2024_V12/JetMET2024_V12p24.root") {
 
     gErrorIgnoreLevel = kError;
 
-    TFile *ifileQCD = new TFile("../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root", "READ");
-    TFile *ifileTTbar = new TFile("../output/TTbar2024_V15/TTbar2024_V15p6_weighted.root", "READ");
-    TFile *ifileWjetMuNu = new TFile("../output/Wjets2024_V14/WjetMuNu2024_V14p8_weighted.root", "READ");
-    TFile *ifileMET = new TFile("../output/JetMET2024_V12/JetMET2024_V12p24.root", "READ");
+    TFile *ifileQCD = new TFile(qcd, "READ");
+    TFile *ifileTTbar = new TFile(ttbar, "READ");
+    TFile *ifileWjetMuNu = new TFile(wjets, "READ");
+    TFile *ifileMET = new TFile(data, "READ");
 
     TH1F *nPV_QCD = (TH1F*)ifileQCD->Get("nPVgood");
     TH1F *nPV_TTbar = (TH1F*)ifileTTbar->Get("nPVgood");
@@ -3248,17 +3288,17 @@ void nPV() {
     nPV_MET->Draw("E1 same");
 
     TLegend *legend = new TLegend(0.7, 0.5, 0.85, 0.9);
-    legend->AddEntry(nPV_QCD, "QCD muEnriched", "f");
-    legend->AddEntry(nPV_TTbar, "TTbar", "f");
-    legend->AddEntry(nPV_WjetMuNu, "W+jets", "f");
-    legend->AddEntry(nPV_MET, "JetMET data", "lep");
+    legend->AddEntry(nPV_QCD, Label("qcd", "QCD muEnriched"), "f");
+    legend->AddEntry(nPV_TTbar, Label("ttbar", "TTbar"), "f");
+    legend->AddEntry(nPV_WjetMuNu, Label("wjets", "W+jets"), "f");
+    legend->AddEntry(nPV_MET, Label("data", "JetMET data"), "lep");
     legend->SetBorderSize(0);
     legend->SetFillStyle(0);
     legend->Draw();
 
     c_nPV->SetLogy();
 
-    c_nPV->SaveAs("../outputDisplay/nPV_nosel.pdf");
+    c_nPV->SaveAs(OutPath("nPV_nosel.pdf"));
 
     // same for the selected events
     TCanvas *c_Sel_nPV = new TCanvas("c_Sel_nPV", "c_Sel_nPV", 800, 600);
@@ -3284,7 +3324,7 @@ void nPV() {
 
     legend->Draw();
     c_Sel_nPV->SetLogy();
-    c_Sel_nPV->SaveAs("../outputDisplay/nPV_sel.pdf");
+    c_Sel_nPV->SaveAs(OutPath("nPV_sel.pdf"));
 
 
     return;
@@ -3746,14 +3786,20 @@ void ComparePseudoMET(bool isRescaled = true) {
     return;
 }
 
-void YieldAfterSF(bool isRescaled = true, bool isMuSelection = false, bool isMETSelection = false, bool isTTbarSelection = false) {
+void YieldAfterSF(bool isRescaled = true, bool isMuSelection = false, bool isMETSelection = false, bool isTTbarSelection = false,
+                  const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p8_weighted.root",
+                  const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p8_weighted.root",
+                  const char *dataMu = "../output/Mu2024_V18/Mu2024_V18.root",
+                  const char *dataMET = "../output/JetMET2024_V12/JetMET2024_V12p24.root",
+                  const char *dataMuonEG = "../output/MuonEG_V17/MuonEG2024_V17p4.root",
+                  const char *gluino = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p1.root") {
 
-    TFile *ifileWmunu = new TFile("../output/Wjets2024_V14/WjetMuNu2024_V14p8_weighted.root", "READ");
-    TFile *ifileTTbar = new TFile("../output/TTbar2024_V15/TTbar2024_V15p8_weighted.root", "READ");
-    TFile *ifileDataMu = new TFile("../output/Mu2024_V18/Mu2024_V18.root", "READ");
-    TFile *ifileDataMET = new TFile("../output/JetMET2024_V12/JetMET2024_V12p24.root", "READ");
-    TFile *ifileDataMuonEG = new TFile("../output/MuonEG_V17/MuonEG2024_V17p4.root", "READ");
-    TFile *ifileGluino = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p1.root", "READ");
+    TFile *ifileWmunu = new TFile(wjets, "READ");
+    TFile *ifileTTbar = new TFile(ttbar, "READ");
+    TFile *ifileDataMu = new TFile(dataMu, "READ");
+    TFile *ifileDataMET = new TFile(dataMET, "READ");
+    TFile *ifileDataMuonEG = new TFile(dataMuonEG, "READ");
+    TFile *ifileGluino = new TFile(gluino, "READ");
 
     TH1F *PostTrigger_PseudoCaloMET_SF_rescaled___MC, *PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA, *PostTrigger_PseudoCaloMET_SF_rescaled___Gluino;
     if (isMuSelection) {
@@ -3846,14 +3892,14 @@ void YieldAfterSF(bool isRescaled = true, bool isMuSelection = false, bool isMET
     TLegend *legend = new TLegend(0.6, 0.7, 0.85, 0.9);
     legend->AddEntry(PostTrigger_PseudoCaloMET_SF_NOTrescaled___DATA, "Data", "lep");
     legend->AddEntry(PostTrigger_PseudoCaloMET_SF_rescaled___MC, Form("MC (%sSF)",(isRescaled) ? "rescaled + " : ""), "f");
-    if (isMETSelection) legend->AddEntry(PostTrigger_PseudoCaloMET_SF_rescaled___Gluino, Form("Gluino2000 (%sSF)",(isRescaled) ? "rescaled + " : ""), "lep");
+    if (isMETSelection) legend->AddEntry(PostTrigger_PseudoCaloMET_SF_rescaled___Gluino, Form("%s (%sSF)", Label("gluino", "Gluino2000"), (isRescaled) ? "rescaled + " : ""), "lep");
     legend->SetBorderSize(0);
     legend->SetFillStyle(0);
     legend->Draw();
     c1->SetLogy();
-    if (isMETSelection) c1->SaveAs(Form("../outputDisplay/YieldAfterSF_HLTmet_%s.pdf", isRescaled ? "_rescaled" : "_NOTrescaled"));
-    else if (isMuSelection) c1->SaveAs(Form("../outputDisplay/YieldAfterSF_HLTmu_%s.pdf", isRescaled ? "_rescaled" : "_NOTrescaled"));
-    else if (isTTbarSelection) c1->SaveAs(Form("../outputDisplay/YieldAfterSF_HLTMuonEG_%s.pdf", isRescaled ? "_rescaled" : "_NOTrescaled"));
+    if (isMETSelection) c1->SaveAs(OutPath("YieldAfterSF_HLTmet_%s.pdf", isRescaled ? "_rescaled" : "_NOTrescaled"));
+    else if (isMuSelection) c1->SaveAs(OutPath("YieldAfterSF_HLTmu_%s.pdf", isRescaled ? "_rescaled" : "_NOTrescaled"));
+    else if (isTTbarSelection) c1->SaveAs(OutPath("YieldAfterSF_HLTMuonEG_%s.pdf", isRescaled ? "_rescaled" : "_NOTrescaled"));
 
 
     return;
@@ -3947,13 +3993,16 @@ void TableGluino(bool isRescaled) {
 }
 
 
-void CompareKinematics() {
+void CompareKinematics(const char *data = "JetMET2024F_V12p313.root",
+                       const char *gluino1400 = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_1400_V19p6.root",
+                       const char *gluino2000 = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p6.root",
+                       const char *gluino2600 = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_2600_V19p6.root") {
 
-    TFile *ifile = new TFile("JetMET2024F_V12p313.root", "READ");
+    TFile *ifile = new TFile(data, "READ");
 
-    TFile *ifileSig1400 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_1400_V19p6.root", "READ");
-    TFile *ifileSig2000 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p6.root", "READ");
-    TFile *ifileSig2600 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2600_V19p6.root", "READ");
+    TFile *ifileSig1400 = new TFile(gluino1400, "READ");
+    TFile *ifileSig2000 = new TFile(gluino2000, "READ");
+    TFile *ifileSig2600 = new TFile(gluino2600, "READ");
 
     TH2F *trackPT_vs_trackPseudoTrackPT = (TH2F*)ifile->Get("trackPT_vs_trackPseudoTrackPT");
     TH2F *trackETA_vs_trackPseudoTrackETA = (TH2F*)ifile->Get("trackETA_vs_trackPseudoTrackETA");
@@ -4032,7 +4081,7 @@ void CompareKinematics() {
     stylePT(trackPT_vs_trackPseudoTrackPT__HSCPmatched_2000);
     stylePT(trackPT_vs_trackPseudoTrackPT__HSCPmatched_2600);
 
-    TLatex *tex = new TLatex(0.62, 0.91, "109 fb^{-1} (13.6 TeV)");
+    TLatex *tex = new TLatex(0.62, 0.91, Label("lumi", "109 fb^{-1} (13.6 TeV)"));
     tex->SetNDC();
     tex->SetTextFont(42);
     tex->SetTextSize(0.04);
@@ -4062,11 +4111,11 @@ void CompareKinematics() {
     tex->Draw();
     c1->SetLogz();
     latex1->Draw();
-    c1->SaveAs("../outputDisplay/CompareKinematics_PT.pdf");
+    c1->SaveAs(OutPath("CompareKinematics_PT.pdf"));
     latex1->SetTitle("#it{Private work (CMS data)}");
     c1->Modified();
     c1->Update();
-    c1->SaveAs("../outputDisplay/CompareKinematics_PT_bis.pdf");
+    c1->SaveAs(OutPath("CompareKinematics_PT_bis.pdf"));
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Work in progress}");
 
 
@@ -4079,11 +4128,11 @@ void CompareKinematics() {
     tex->Draw();
     c2->SetLogz();
     latex1->Draw();
-    c2->SaveAs("../outputDisplay/CompareKinematics_ETA.pdf");
+    c2->SaveAs(OutPath("CompareKinematics_ETA.pdf"));
     latex1->SetTitle("#it{Private work (CMS data)}");
     c2->Modified();
     c2->Update();
-    c2->SaveAs("../outputDisplay/CompareKinematics_ETA_bis.pdf");
+    c2->SaveAs(OutPath("CompareKinematics_ETA_bis.pdf"));
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Work in progress}");
 
     TCanvas *c3 = new TCanvas("c3", "c3", 800, 600);
@@ -4095,11 +4144,11 @@ void CompareKinematics() {
     tex->Draw();
     c3->SetLogz();
     latex1->Draw();
-    c3->SaveAs("../outputDisplay/CompareKinematics_PHI.pdf");
+    c3->SaveAs(OutPath("CompareKinematics_PHI.pdf"));
     latex1->SetTitle("#it{Private work (CMS data)}");
     c3->Modified();
     c3->Update();
-    c3->SaveAs("../outputDisplay/CompareKinematics_PHI_bis.pdf");
+    c3->SaveAs(OutPath("CompareKinematics_PHI_bis.pdf"));
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Work in progress}");
 
 
@@ -4113,11 +4162,11 @@ void CompareKinematics() {
     c4->SetLogz();
     latex1->Draw();
     latexPF->Draw();
-    c4->SaveAs("../outputDisplay/CompareKinematics_PT_PFmuon.pdf");
+    c4->SaveAs(OutPath("CompareKinematics_PT_PFmuon.pdf"));
     latex1->SetTitle("#it{Private work (CMS data)}");
     c4->Modified();
     c4->Update();
-    c4->SaveAs("../outputDisplay/CompareKinematics_PT_PFmuon_bis.pdf");
+    c4->SaveAs(OutPath("CompareKinematics_PT_PFmuon_bis.pdf"));
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Work in progress}");
 
 
@@ -4132,11 +4181,11 @@ void CompareKinematics() {
     latex1->Draw();
     latexPF->SetTitle("#bf{PF pions}");
     latexPF->Draw();
-    c5->SaveAs("../outputDisplay/CompareKinematics_PT_PFpion.pdf");
+    c5->SaveAs(OutPath("CompareKinematics_PT_PFpion.pdf"));
     latex1->SetTitle("#it{Private work (CMS data)}");
     c5->Modified();
     c5->Update();
-    c5->SaveAs("../outputDisplay/CompareKinematics_PT_PFpion_bis.pdf");
+    c5->SaveAs(OutPath("CompareKinematics_PT_PFpion_bis.pdf"));
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Work in progress}");
 
 
@@ -4149,14 +4198,14 @@ void CompareKinematics() {
     trackPT_vs_trackPseudoTrackPT__HSCPmatched_1400->Draw("COLZ");
     c6->SetLogz();
     latex1->Draw();
-    latexglu->SetTitle("#bf{HSCP matched (m#scale[0.7]{#tilde{g}}=1400 GeV)}");
+    latexglu->SetTitle(Form("#bf{HSCP matched (%s)}", Label("gluino1400", "m#scale[0.7]{#tilde{g}}=1400 GeV")));
     latexglu->SetX(0.53);
     latexglu->Draw();
-    c6->SaveAs("../outputDisplay/CompareKinematics_PT_HSCPmatched_1400.pdf");
+    c6->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_1400.pdf"));
     latex1->SetTitle("#it{Private work (CMS simulation)}");
     c6->Modified();
     c6->Update();
-    c6->SaveAs("../outputDisplay/CompareKinematics_PT_HSCPmatched_1400_bis.pdf");
+    c6->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_1400_bis.pdf"));
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Simulation Work in progress}");
 
 
@@ -4169,13 +4218,13 @@ void CompareKinematics() {
     trackPT_vs_trackPseudoTrackPT__HSCPmatched_2000->Draw("COLZ");
     c7->SetLogz();
     latex1->Draw();
-    latexglu->SetTitle("#bf{HSCP matched (m#scale[0.7]{#tilde{g}}=2000 GeV)}");
+    latexglu->SetTitle(Form("#bf{HSCP matched (%s)}", Label("gluino2000", "m#scale[0.7]{#tilde{g}}=2000 GeV")));
     latexglu->Draw();
-    c7->SaveAs("../outputDisplay/CompareKinematics_PT_HSCPmatched_2000.pdf");
+    c7->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_2000.pdf"));
     latex1->SetTitle("#it{Private work (CMS simulation)}");
     c7->Modified();
     c7->Update();
-    c7->SaveAs("../outputDisplay/CompareKinematics_PT_HSCPmatched_2000_bis.pdf");
+    c7->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_2000_bis.pdf"));
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Simulation Work in progress}");
 
 
@@ -4188,13 +4237,13 @@ void CompareKinematics() {
     trackPT_vs_trackPseudoTrackPT__HSCPmatched_2600->Draw("COLZ");
     c8->SetLogz();
     latex1->Draw();
-    latexglu->SetTitle("#bf{HSCP matched (m#scale[0.7]{#tilde{g}}=2600 GeV)}");
+    latexglu->SetTitle(Form("#bf{HSCP matched (%s)}", Label("gluino2600", "m#scale[0.7]{#tilde{g}}=2600 GeV")));
     latexglu->Draw();
-    c8->SaveAs("../outputDisplay/CompareKinematics_PT_HSCPmatched_2600.pdf");
+    c8->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_2600.pdf"));
     latex1->SetTitle("#it{Private work (CMS simulation)}");
     c8->Modified();
     c8->Update();
-    c8->SaveAs("../outputDisplay/CompareKinematics_PT_HSCPmatched_2600_bis.pdf");
+    c8->SaveAs(OutPath("CompareKinematics_PT_HSCPmatched_2600_bis.pdf"));
     latex1->SetTitle("#scale[1.3]{#bf{CMS}}#it{Simulation Work in progress}");
 
 
@@ -4290,18 +4339,18 @@ void LangausFitOnIh() {
     return;
 }
 
-void ShowSignalEfficiency() {
+void ShowSignalEfficiency(const char *gluinoPattern = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_%d_V19p3_weighted.root") {
 
-    TFile *ifileGluino1100 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_1100_V19p3_weighted.root", "READ");
-    TFile *ifileGluino1200 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_1200_V19p3_weighted.root", "READ");
-    TFile *ifileGluino1300 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_1300_V19p3_weighted.root", "READ");
-    TFile *ifileGluino1400 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_1400_V19p3_weighted.root", "READ");
-    TFile *ifileGluino1600 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_1600_V19p3_weighted.root", "READ");
-    TFile *ifileGluino1800 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_1800_V19p3_weighted.root", "READ");
-    TFile *ifileGluino2000 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p3_weighted.root", "READ");
-    TFile *ifileGluino2200 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2200_V19p3_weighted.root", "READ");
-    TFile *ifileGluino2400 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2400_V19p3_weighted.root", "READ");
-    TFile *ifileGluino2600 = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2600_V19p3_weighted.root", "READ");
+    // one weighted file per mass: gluinoPattern with %d replaced by the mass; masses without a file are skipped
+    std::map<int, TFile*> ifiles;
+    for (int m : {1100, 1200, 1300, 1400, 1600, 1800, 2000, 2200, 2400, 2600}) {
+        TString path = TString::Format(gluinoPattern, m);
+        if (gSystem->AccessPathName(path)) {
+            cout << "ShowSignalEfficiency: no file for mass " << m << " (" << path << "), skipped" << endl;
+            continue;
+        }
+        ifiles[m] = new TFile(path, "READ");
+    }
 
     std::vector <string> etaname = {"METanalysis_PseudoMETrescaled_Eta1",
                             "METanalysis_PseudoMETrescaled_Eta1_2p4",
@@ -4314,18 +4363,8 @@ void ShowSignalEfficiency() {
     for (int j = 0; j < etaname.size(); j++) {
         
         for (int i = 1100; i <= 2600; i += 100) {
-            TFile *ifile = nullptr;
-            if (i == 1100) ifile = ifileGluino1100;
-            else if (i == 1200) ifile = ifileGluino1200;
-            else if (i == 1300) ifile = ifileGluino1300;
-            else if (i == 1400) ifile = ifileGluino1400;
-            else if (i == 1600) ifile = ifileGluino1600;
-            else if (i == 1800) ifile = ifileGluino1800;
-            else if (i == 2000) ifile = ifileGluino2000;
-            else if (i == 2200) ifile = ifileGluino2200;
-            else if (i == 2400) ifile = ifileGluino2400;
-            else if (i == 2600) ifile = ifileGluino2600;
-            else continue;
+            if (!ifiles.count(i)) continue;
+            TFile *ifile = ifiles[i];
 
             TH1D *WithSelection = (TH1D*)ifile->Get(Form("%s_nHSCP", etaname[j].c_str()));
             TH1D *WithoutSelection = (TH1D*)ifile->Get("nHSCP");
@@ -4363,19 +4402,22 @@ void ShowSignalEfficiency() {
     legend->AddEntry(pEffs[2], "|#eta| < 2.4", "lep");
     legend->Draw();
 
-    c1->SaveAs("../outputDisplay/SignalEfficiency_vs_GluinoMass.pdf");
+    c1->SaveAs(OutPath("SignalEfficiency_vs_GluinoMass.pdf"));
 
 
     return;
 }
 
 
-void FpixSlices() {
+void FpixSlices(const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p11_weighted.root",
+                const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p5_weighted.root",
+                const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root",
+                const char *gluino = "../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p3.root") {
 
-    TFile *fileWjets = new TFile("../output/Wjets2024_V14/WjetMuNu2024_V14p11_weighted.root", "READ");
-    TFile *fileTTbar = new TFile("../output/TTbar2024_V15/TTbar2024_V15p5_weighted.root", "READ");
-    TFile *fileQCD = new TFile("../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root", "READ");
-    TFile *fileSignal = new TFile("../output/Gluino_V19/Gluino_Run3_MET_madgraph_2000_V19p3.root", "READ");
+    TFile *fileWjets = new TFile(wjets, "READ");
+    TFile *fileTTbar = new TFile(ttbar, "READ");
+    TFile *fileQCD = new TFile(qcd, "READ");
+    TFile *fileSignal = new TFile(gluino, "READ");
     
     TH1F *FpixGluino_Eta1 = (TH1F*)fileSignal->Get("METanalysis_PseudoMETrescaled_Eta1_Fpix");
     TH1F *FpixGluino_Eta1_2p4 = (TH1F*)fileSignal->Get("METanalysis_PseudoMETrescaled_Eta1_2p4_Fpix");
@@ -4721,14 +4763,17 @@ void Corr_Ih_1oP(std::string eta) {
 }
 
 
-void Acceptance_EtaSlice_DataMC() {
+void Acceptance_EtaSlice_DataMC(const char *data = "../output/JetMET2024_V12/JetMET2024_V12p27.root",
+                                const char *wjets = "../output/Wjets2024_V14/WjetMuNu2024_V14p8_weighted.root",
+                                const char *ttbar = "../output/TTbar2024_V15/TTbar2024_V15p6_weighted.root",
+                                const char *qcd = "../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root") {
 
-    TFile *fData = new TFile("../output/JetMET2024_V12/JetMET2024_V12p27.root", "READ");
+    TFile *fData = new TFile(data, "READ");
 
     std::vector<TFile*> TFileMC = {
-        new TFile("../output/Wjets2024_V14/WjetMuNu2024_V14p8_weighted.root",  "READ"),
-        new TFile("../output/TTbar2024_V15/TTbar2024_V15p6_weighted.root",  "READ"),
-        new TFile("../output/QCD2024_V16/QCD2024_mu_V16p1_weighted.root",    "READ")
+        new TFile(wjets,  "READ"),
+        new TFile(ttbar,  "READ"),
+        new TFile(qcd,    "READ")
     };
 
 
@@ -4740,7 +4785,7 @@ void Acceptance_EtaSlice_DataMC() {
 
     std::vector<TH1D*> h_accs;
 
-    TFile *ofile = new TFile("../outputDisplay/Acceptance_EtaSlice_DataMC.root", "RECREATE");
+    TFile *ofile = new TFile(OutPath("Acceptance_EtaSlice_DataMC.root"), "RECREATE");
 
     const int nSlices = 24;  // |eta| de 0.1 à 2.4 par pas de 0.1
 
@@ -4821,7 +4866,8 @@ void Acceptance_EtaSlice_DataMC() {
         h->GetYaxis()->SetLabelSize(0.05);
 
         h->Draw(i == 0 ? "PE" : "PE SAME");
-        leg->AddEntry(h, labels[i], "lp");
+        const char *legKeys[] = {"data", "wjets", "ttbar", "qcd"};
+        leg->AddEntry(h, Label(legKeys[i], labels[i]), "lp");
     }
     leg->Draw();
 
@@ -4831,7 +4877,7 @@ void Acceptance_EtaSlice_DataMC() {
     latex1->SetTextSize(0.04);
     latex1->Draw();
 
-    c->SaveAs("../outputDisplay/Acceptance_EtaSlice_DataMC.pdf");
+    c->SaveAs(OutPath("Acceptance_EtaSlice_DataMC.pdf"));
 
     ofile->cd();
     c->Write();
@@ -4840,8 +4886,8 @@ void Acceptance_EtaSlice_DataMC() {
     latex1->SetText(0.16, 0.91, "#it{Private work (CMS data)}");
     c->Modified();
     c->Update();
-    c->SaveAs("../outputDisplay/Acceptance_EtaSlice_DataMC_bis.pdf");
-    c->SaveAs("../outputDisplay/Acceptance_EtaSlice_DataMC_bis.C");
+    c->SaveAs(OutPath("Acceptance_EtaSlice_DataMC_bis.pdf"));
+    c->SaveAs(OutPath("Acceptance_EtaSlice_DataMC_bis.C"));
 
     ofile->Close();
 

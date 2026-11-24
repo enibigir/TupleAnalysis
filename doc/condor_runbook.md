@@ -311,12 +311,48 @@ their exit codes.
 
 ## 10. Hand the results to the plotting macros
 
-`CombineHistos.C` reads fixed paths such as `../output/QCD2024_V16/QCD2024_mu_V16p2_weighted.root`:
-write the outputs of step 9 there (`-o`), or edit the paths of the functions you call.
+The data/simulation validation plots of `macros/CombineHistos.C` are made by `python/plots.py` from
+the files named in `cfg/plots.json`: name each input once (`data`, `qcd`, `ttbar`, `wjets`, `gluino`, ...),
+the plots refer to these names.
+
+```json
+"lumi_label": "7.98 fb^{-1} (13.6 TeV)",
+"inputs": {"data":   {"file": "output/JetMET2024_V1/JetMET2024.root", "label": "JetMET data 2024"},
+           "qcd":    {"file": "output/QCD2024_V1/QCD2024_7p98fb_weighted.root", "label": "QCD (#mu enriched)"},
+           "gluino": {"file": "output/gluino1600_v1/Gluino_1600_weighted.root", "label": "#tilde{g} (m=1600 GeV)"},
+           "gluino_mass": "output/Gluino_V1/Gluino_Run3_MET_madgraph_%d_weighted.root", ...},
+"plots":  [{"function": "nPV", "args": ["qcd", "ttbar", "wjets", "data"]}, ...]
+```
+
+An input is a path, or `{"file", "label"}` to set its legend entry (ROOT TLatex); `lumi_label` sets the
+luminosity text of the plots that print one (`Cutflows`, `CompareKinematics`). The legends of `Cutflows`,
+`nPV`, `nHSCP`, `FpixelPlot`, `Acceptance_EtaSlice_DataMC`, `CompareKinematics` (the three masses) and
+`YieldAfterSF` (the signal) take these labels; an input without a label keeps the text of the macro.
+`--list` shows the label of each input.
+
+```bash
+source env.sh
+python3 python/plots.py --list                  # each plot, its inputs, MISSING for those not found
+python3 python/plots.py                         # every plot; outputs in output_dir (outputDisplay/V1)
+python3 python/plots.py --only 'nPV,Cutflows'   # some of them
+python3 python/plots.py --jobs 4                # several at a time (about 5 s each to load the macro)
+```
+
+Each plot runs in its own `root` process (log in `<output_dir>/logs/<name>.log`), so one failure does
+not stop the others; a plot whose input files are missing is skipped. Before running, `plots.py` warns
+about histograms that a function reads by name and that none of its inputs holds: the function would
+crash on them (`crashed (segmentation violation)`). That happens when the selections of
+`cfg/selections.json` were renamed since the function was written: `nPV`, `nHSCP`, `FpixSlices` and
+`ShowSignalEfficiency` read `METanalysis_Eta2p4_*` or `METanalysis_PseudoMETrescaled_*` histograms, and
+`YieldAfterSF` the `CalibPseudoMET_*` ones of the calibration selections.
+
+The converted functions are `Cutflows`, `nPV`, `nHSCP`, `FpixelPlot`, `FpixSlices`, `CompareMaping`,
+`Acceptance_EtaSlice_DataMC`, `CompareKinematics`, `ShowSignalEfficiency` (one `%d` pattern for the
+masses) and `YieldAfterSF`. Their old paths are the default values of their new parameters, so the calls
+in `CombineHistos()` still work; the others keep their fixed paths:
 
 ```bash
 cd macros && root -l -b -q CombineHistos.C && cd ..      # enable the wanted plots in its main function
-ls outputDisplay/
 ```
 
 ## 11. Trigger scale factors (when the calibration selections were run)

@@ -1,0 +1,35 @@
+{
+  "_comment": "Inputs of python/plots.py: paths relative to the repository; %d in a path is the gluino mass. An input is a path or {\"file\", \"label\"}; labels are ROOT TLatex. See python/hscp/plots.py.",
+  "output_dir": "outputDisplay/V1",
+  "lumi_label": "7.98 fb^{-1} (13.6 TeV)",
+  "inputs": {
+    "data":              {"file": "output/JetMET2024_V1/JetMET2024.root", "label": "JetMET data 2024"},
+    "data_mu":           {"file": "output/Mu2024_V1/Mu2024.root", "label": "Muon data 2024"},
+    "data_muoneg":       {"file": "output/MuonEG2024_V1/MuonEG2024.root", "label": "MuonEG data 2024"},
+    "qcd":               {"file": "output/QCD2024_V1/QCD2024_7p98fb_weighted.root", "label": "QCD (#mu enriched)"},
+    "ttbar":             {"file": "output/TTbar2024_V1/TTbar2024_weighted.root", "label": "t#bar{t}#rightarrow2l2#nu"},
+    "ttbar_semilep":     {"file": "output/TTbarSemiLep2024_V1/TTbarSemiLep2024_weighted.root", "label": "t#bar{t}#rightarrowl#nu"},
+    "wjets":             {"file": "output/Wjets2024_V1/WjetMuNu2024_weighted.root", "label": "W(#rightarrow#mu#nu)+jets"},
+    "gluino":            {"file": "output/gluino1600_v1/Gluino_1600_weighted.root", "label": "#tilde{g} (m=1600 GeV)"},
+    "gluino_unweighted": {"file": "output/gluino1600_v1/Gluino_Run3_MET_madgraph_1600.root", "label": "#tilde{g} (m=1600 GeV)"},
+    "gluino_1400":       {"file": "output/Gluino_V1/Gluino_Run3_MET_madgraph_1400.root", "label": "m#scale[0.7]{#tilde{g}}=1400 GeV"},
+    "gluino_2000":       {"file": "output/Gluino_V1/Gluino_Run3_MET_madgraph_2000.root", "label": "m#scale[0.7]{#tilde{g}}=2000 GeV"},
+    "gluino_2600":       {"file": "output/Gluino_V1/Gluino_Run3_MET_madgraph_2600.root", "label": "m#scale[0.7]{#tilde{g}}=2600 GeV"},
+    "gluino_mass":       "output/Gluino_V1/Gluino_Run3_MET_madgraph_%d_weighted.root"
+  },
+  "plots": [
+    {"function": "Cutflows", "args": ["qcd", "ttbar", "ttbar_semilep", "wjets", "data", "gluino"], "note": "event cutflow of each background, data and signal"},
+    {"function": "nPV", "args": ["qcd", "ttbar", "wjets", "data"], "note": "number of primary vertices, before and after the selection"},
+    {"function": "nHSCP", "args": ["qcd", "ttbar", "wjets", "data"], "note": "number of HSCP candidates, before and after the selection"},
+    {"function": "FpixelPlot", "args": ["wjets", "data", "gluino_unweighted"], "note": "N-1 Fpixel distribution"},
+    {"function": "FpixSlices", "args": ["wjets", "ttbar", "qcd", "gluino_unweighted"], "note": "Fpixel quantiles of signal and background, printed in the log"},
+    {"function": "CompareMaping", "args": ["ttbar", "wjets", "qcd", "gluino"], "note": "background composition against the signal"},
+    {"function": "Acceptance_EtaSlice_DataMC", "args": ["data", "wjets", "ttbar", "qcd"], "note": "acceptance per eta slice, data and simulation"},
+    {"function": "CompareKinematics", "args": ["data", "gluino_1400", "gluino_2000", "gluino_2600"], "note": "pT, eta, phi of data and three gluino masses; their labels name the masses"},
+    {"function": "ShowSignalEfficiency", "args": ["gluino_mass"], "note": "signal efficiency against the gluino mass; masses without a file are left out"},
+    {"name": "YieldAfterSF_MET", "function": "YieldAfterSF", "args": [true, false, true, false, "wjets", "ttbar", "data_mu", "data", "data_muoneg", "gluino_unweighted"], "note": "HLT MET + HSCP selection, rescaled (the function opens all six files whatever the selection)"},
+    {"name": "YieldAfterSF_MET_notrescaled", "function": "YieldAfterSF", "args": [false, false, true, false, "wjets", "ttbar", "data_mu", "data", "data_muoneg", "gluino_unweighted"]},
+    {"name": "YieldAfterSF_Mu", "function": "YieldAfterSF", "args": [true, true, false, false, "wjets", "ttbar", "data_mu", "data", "data_muoneg", "gluino_unweighted"], "note": "HLT Mu + HSCP selection, rescaled"},
+    {"name": "YieldAfterSF_MuonEG", "function": "YieldAfterSF", "args": [true, false, false, true, "wjets", "ttbar", "data_mu", "data", "data_muoneg", "gluino_unweighted"], "note": "HLT MuonEG + HSCP selection, rescaled"}
+  ]
+}

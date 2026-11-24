@@ -8,7 +8,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "python"))
-from hscp import config, driver, proxy, selector, storage, weight  # noqa: E402
+from hscp import config, driver, plots, proxy, selector, storage, weight  # noqa: E402
 
 
 class ConfigTests(unittest.TestCase):
@@ -497,6 +497,132 @@ class MergeTests(unittest.TestCase):
             p = run("--input-dir", os.path.join(other, "nope"))
             self.assertNotEqual(p.returncode, 0)
             self.assertIn("is not a directory", p.stderr)
+
+
+
+class PlotsTests(unittest.TestCase):
+    DOC = {"output_dir": "out/plots",
+           "inputs": {"data": "output/d.root", "qcd": "/abs/q.root", "sig": "output/S_%d.root"},
+           "plots": [{"function": "nPV", "args": ["qcd", "data"]},
+                     {"name": "Y_MET", "function": "Y", "args": [True, 2, 0.5, {"str": 'a"b'}, "sig"]}]}
+    MACRO = """// comment
+TString OutPath(const char *fmt, ...) { return ""; }
+void nPV(const char *qcd = "../output/x.root",
+         const char *data = "y.root") {
+    TFile *f = new TFile(qcd, "READ");
+    TH1F *h = (TH1F*)f->Get("METanalysis_Eta2p4_nPVgood");
+    // TH1F *old = (TH1F*)f->Get("Old_name");
+    TH1F *g = (TH1F*)f->Get(Form("%s_nPV", "x"));
+}
+void Y(bool a, int b, double c = 1, std::string d = "x,y", const char *e = "s") {
+    h = f->Get("A"); h2 = f->Get("A");
+}
+"""
+
+    def cfg(self, **change):
+        return plots.PlotConfig(dict(self.DOC, **change), "t.json", base="/repo")
+
+    def test_config(self):
+        c = self.cfg()
+        self.assertEqual(c.output_dir, "/repo/out/plots")
+        self.assertEqual(c.inputs["data"], "/repo/output/d.root")
+        self.assertEqual(c.inputs["qcd"], "/abs/q.root")
+        self.assertEqual([p.name for p in c.plots], ["nPV", "Y_MET"])
+        self.assertEqual(c.call(c.plots[0]), 'nPV("/abs/q.root", "/repo/output/d.root")')
+        self.assertEqual(c.call(c.plots[1]), 'Y(true, 2, 0.5, "a\\"b", "/repo/output/S_%d.root")')
+        self.assertEqual([p.name for p in c.select(["Y*"])], ["Y_MET"])
+        with self.assertRaisesRegex(plots.PlotError, "no plot named zz"):
+            c.select(["zz"])
+
+    def test_config_errors(self):
+        for change, msg in ((dict(plots=[{"function": "f", "args": ["nope"]}]), "'nope' is not an input"),
+                            (dict(plots=[{"function": "f"}, {"function": "f"}]), "used twice: f"),
+                            (dict(plots=[]), "non-empty list"),
+                            (dict(plots=[{"function": "f", "args": [{"text": "x"}]}]), "literal string"),
+                            (dict(plot=[]), "unknown key")):
+            with self.assertRaisesRegex(plots.PlotError, msg, msg=change):
+                self.cfg(**change)
+
+    def test_labels(self):
+        c = self.cfg(inputs={"data": {"file": "d.root", "label": "Data 2024"}, "qcd": "q.root",
+                             "sig": {"file": "S_%d.root", "label": 'g "1600"'}},
+                     lumi_label="7.98 fb^{-1}")
+        self.assertEqual(c.inputs["data"], "/repo/d.root")
+        self.assertEqual(c.labels, {"data": "Data 2024", "sig": 'g "1600"'})
+        params = plots.signature(self.MACRO, "nPV")
+        self.assertEqual([plots.param_name(q) for q in params], ["qcd", "data"])
+        # keyed by the parameter receiving the input: here input "data" goes to parameter "data"
+        self.assertEqual(c.legend_labels(c.plots[0], params), {"data": "Data 2024", "lumi": "7.98 fb^{-1}"})
+        y = plots.signature(self.MACRO, "Y")
+        self.assertEqual(c.legend_labels(c.plots[1], y), {"e": 'g "1600"', "lumi": "7.98 fb^{-1}"})
+        line = " ".join(plots.root_command(c, c.plots[1], c.legend_labels(c.plots[1], y)))
+        self.assertIn('gLabels["e"] = "g \\"1600\\"";', line)
+        for bad in ({"data": {"label": "x"}}, {"data": {"file": "d", "color": 2}}, {"data": 3}):
+            with self.assertRaisesRegex(plots.PlotError, "must be a path", msg=bad):
+                self.cfg(inputs=dict(self.DOC["inputs"], **bad))
+
+    def test_signature_and_checks(self):
+        self.assertEqual([p.has_default for p in plots.signature(self.MACRO, "nPV")], [True, True])
+        params = plots.signature(self.MACRO, "Y")
+        self.assertEqual(len(params), 5)                       # the comma inside "x,y" is not a separator
+        self.assertEqual([p.has_default for p in params], [False, False, True, True, True])
+        self.assertIsNone(plots.signature(self.MACRO, "Nope"))
+        c = self.cfg(plots=[{"function": "nPV", "args": ["qcd", "data", "qcd"]},
+                            {"name": "y1", "function": "Y", "args": [True]},
+                            {"name": "y2", "function": "Y", "args": [True, 1]},
+                            {"function": "Nope"}])
+        errors = plots.check_calls(c, c.plots, self.MACRO)
+        self.assertEqual(len(errors), 3)
+        self.assertIn("nPV: nPV takes 0 to 2 argument(s), 3 given", errors[0])
+        self.assertIn("y1: Y takes 2 to 5 argument(s), 1 given", errors[1])
+        self.assertIn("no function Nope", errors[2])
+
+    def test_histogram_names(self):
+        self.assertEqual(plots.histogram_names(self.MACRO, "nPV"), ["METanalysis_Eta2p4_nPVgood"])
+        self.assertEqual(plots.histogram_names(self.MACRO, "Y"), ["A"])
+
+    def test_inputs_and_command(self):
+        with tempfile.TemporaryDirectory() as d:
+            open(os.path.join(d, "S_1600.root"), "w").close()
+            open(os.path.join(d, "d.root"), "w").close()
+            c = plots.PlotConfig(dict(self.DOC, inputs={"data": "d.root", "qcd": "q.root", "sig": "S_%d.root"}), "t", base=d)
+            self.assertEqual(c.missing_inputs(c.plots[0]), [("qcd", os.path.join(d, "q.root"))])
+            self.assertEqual(c.missing_inputs(c.plots[1]), [])           # the pattern matches S_1600.root
+        argv = plots.root_command(self.cfg(), self.cfg().plots[0])
+        self.assertEqual(argv[:4], ["root", "-l", "-b", "-q"])
+        line = " ".join(argv)
+        self.assertIn('LoadMacro("CombineHistos.C")', line)
+        self.assertIn('gOutDir = "/repo/out/plots";', line)
+        self.assertIn('gInterpreter->Declare(R"HSCP(void hscp_plot() { nPV("/abs/q.root", "/repo/output/d.root"); })HSCP")', line)
+
+    def test_repository_plots_match_the_macro(self):
+        """Every plot of cfg/plots.json calls a function of the macro with an accepted number of arguments."""
+        c = plots.load()
+        with open(c.macro) as f:
+            macro = f.read()
+        self.assertEqual(plots.check_calls(c, c.plots, macro), [])
+        self.assertIn("TString OutPath(const char *fmt, ...)", macro)
+        self.assertIn("const char *Label(const char *key, const char *fallback)", macro)
+        # every label key of a converted function, Label("key", ...) or legKeys, is one of its parameters or "lumi"
+        import re
+        for name in ("Cutflows", "nPV", "nHSCP", "FpixelPlot", "Acceptance_EtaSlice_DataMC", "CompareKinematics",
+                     "YieldAfterSF"):
+            body = plots.function_body(macro, name)
+            keys = set(re.findall(r'Label\("(\w+)"', body))
+            leg = re.search(r"legKeys\[\] = \{([^}]*)\}", body)
+            if leg:
+                keys |= set(re.findall(r'"(\w+)"', leg.group(1)))
+            names = {plots.param_name(q) for q in plots.signature(macro, name)} | {"lumi"}
+            self.assertTrue(keys, name)
+            self.assertLessEqual(keys, names, name)
+        for name in ("FpixelPlot", "CompareMaping", "nPV", "nHSCP", "FpixSlices", "Acceptance_EtaSlice_DataMC",
+                     "CompareKinematics", "ShowSignalEfficiency", "YieldAfterSF", "Cutflows"):
+            params = plots.signature(macro, name)
+            self.assertIsNotNone(params, name)
+            body = macro[macro.index(f"void {name}("):]
+            body = body[:body.index("\nvoid ", 10)]
+            live = [l for l in body.splitlines() if "../outputDisplay" in l and not l.strip().startswith("//")]
+            self.assertEqual(live, [], name)
 
 
 if __name__ == "__main__":
