@@ -94,18 +94,28 @@ def main():
     if shutil.which("hadd") is None:
         sys.exit("hadd not found in PATH: source env.sh first")
 
+    skipped = [key for key in sorted(per_sample) if key not in complete]
+    if skipped or complete:
+        print()
+    for key in skipped:
+        print(f"skipped    {key:<32} jobs missing (--force merges the outputs present)")
+
     merged_dir = os.path.join(work, "merged")
     os.makedirs(merged_dir, exist_ok=True)
     failed = 0
     for key in complete:
         inputs = [storage.join(location, out) for out, _ in per_sample[key] if sizes.get(out, 0) >= args.min_size]
         target = os.path.join(merged_dir, f"{key}.root")
-        print(f"\nhadd -T -f {target}  ({len(inputs)} files)")
+        print(f"processing {key} ({len(inputs)} files) ...", flush=True)
         r = subprocess.run(["hadd", "-T", "-f", target] + inputs, stdout=subprocess.DEVNULL)
         if r.returncode != 0:
             failed += 1
-            print(f"  FAILED (exit {r.returncode})")
-    print(f"\n{len(complete) - failed} sample(s) merged into {merged_dir}" + (f", {failed} failed" if failed else ""))
+            print(f"FAILED     {key:<32} hadd exit code {r.returncode}", flush=True)
+        else:
+            print(f"completed  {key:<32} -> {target}", flush=True)
+    print(f"\n{len(complete) - failed} / {len(per_sample)} sample(s) merged into {merged_dir}"
+          + (f", {failed} failed" if failed else "")
+          + (f", {len(skipped)} skipped" if skipped else ""))
     return 1 if failed or missing_lines else 0
 
 

@@ -301,7 +301,7 @@ python3 python/Weight.py --samples TestGluino_Run3_MET_madgraph_1600 --input-dir
 python3 python/Weight.py --samples TestJetMET2024C --input-dir $D -o $D/weighted/TestJetMET2024C.root -f > $D/weighted/TestJetMET2024C.log 2>&1 & p3=$!
 wait $p1; e1=$?; wait $p2; e2=$?; wait $p3; e3=$?
 echo "exit codes $e1 $e2 $e3"                    # 0 0 0
-tail -qn1 $D/weighted/*.log                      # each: "20268 histograms written to ..."
+tail -qn1 $D/weighted/*.log                      # each: "completed  ...: 20268 histograms written"
 ```
 
 Run the dry runs first, one after the other: they are quick and print the factors to check. Give

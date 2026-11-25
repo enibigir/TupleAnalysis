@@ -143,7 +143,7 @@ def main(argv=None):
     except weight.WeightError as e:
         sys.exit(f"Weight: {e}")
     if missing:
-        print(f"warning: {len(missing)} sample(s) left out, their input is missing:\n  " + "\n  ".join(missing) + "\n")
+        print(f"skipped    {len(missing)} sample(s), their input is missing:\n  " + "\n  ".join(missing) + "\n")
         paths = {s: paths[s] for s in samples}
     output = args.output or weight.default_output(cfg, samples, args.input_dir)
     if not output and not args.dry_run:
@@ -171,6 +171,7 @@ def main(argv=None):
     for e, f in zip(entries, files):
         if not f or f.IsZombie():
             sys.exit(f"Weight: cannot open {paths[e.sample]}")
+    print(f"\nprocessing {output} ...", flush=True)
     tmp = output + ".part"
     out = ROOT.TFile.Open(tmp, "RECREATE")
     stats = {"histograms": 0, "copied": 0, "skipped": [], "partial": []}
@@ -185,12 +186,12 @@ def main(argv=None):
         f.Close()
     os.replace(tmp, output)
 
-    print(f"\n{stats['histograms']} histograms written to {output}"
+    print(f"completed  {output}: {stats['histograms']} histograms written"
           + (f", {stats['copied']} other objects copied" if stats["copied"] else ""))
     if stats["skipped"]:
-        print(f"trees left out: {', '.join(stats['skipped'])}")
+        print(f"skipped    trees: {', '.join(stats['skipped'])}")
     if stats["partial"]:
-        print(f"warning: {len(stats['partial'])} object(s) missing from some samples, e.g. {stats['partial'][0]}")
+        print(f"warning    {len(stats['partial'])} object(s) missing from some samples, e.g. {stats['partial'][0]}")
 
 
 if __name__ == "__main__":

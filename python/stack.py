@@ -88,7 +88,7 @@ class Drawer:
         bkgs = [(n, h) for n, h in bkgs if h]
         sigs = [(n, h) for n, h in sigs if h]
         if missing:
-            print(f"warning: {name} is not a 1D histogram of {', '.join(missing)}: left out")
+            print(f"warning    {name} is not a 1D histogram of {', '.join(missing)}: left out")
         drawn = ([data] if data else []) + [h for _, h in bkgs + sigs]
         if not drawn:
             return None
@@ -267,7 +267,7 @@ class Drawer:
         yields = ([(s.data, data.Integral())] if data else []) + [(n, h.Integral()) for n, h in bkgs] \
             + ([("total MC", total.Integral())] if total else []) \
             + [(n + (f" (x{a.signal_scale:g})" if a.signal_scale != 1 else ""), h.Integral()) for n, h in sigs]
-        print(f"{name}:  " + ",  ".join(f"{n} {v:.6g}" for n, v in yields))
+        print(f"completed  {name}:  " + ",  ".join(f"{n} {v:.6g}" for n, v in yields))
         return written
 
 
@@ -330,11 +330,12 @@ def main(argv=None):
         sys.exit(f"stack: {e}")
     skipped = 0
     for name in hists:
+        print(f"processing {name} ...", flush=True)
         base = os.path.join(out_dir, stack.file_name(name) + ("_log" if args.logy else ""))
         if drawer.draw(name, base) is None:
             skipped += 1
-            print(f"warning: {name}: no sample holds it, nothing drawn")
-    print(f"\n{len(hists) - skipped} plot(s) in {out_dir}")
+            print(f"skipped    {name}: no sample holds it, nothing drawn")
+    print(f"\n{len(hists) - skipped} / {len(hists)} plot(s) made in {out_dir}" + (f", {skipped} skipped" if skipped else ""))
     return 1 if skipped else 0
 
 

@@ -129,7 +129,7 @@ def main(argv=None):
         missing = cfg.missing_inputs(p)
         if missing:
             skipped.append(p)
-            print(f"skip  {p.name:<28} missing input(s): " + ", ".join(f"{n} ({path})" for n, path in missing))
+            print(f"skipped    {p.name:<28} missing input(s): " + ", ".join(f"{n} ({path})" for n, path in missing))
         else:
             runnable.append(p)
 
@@ -143,19 +143,20 @@ def main(argv=None):
         for p in runnable:
             absent = missing_histograms(cfg, p, plots.histogram_names(macro_text, p.function), ROOT)
             if absent:
-                print(f"warn  {p.name:<28} {len(absent)} histogram(s) not in its inputs: " + ", ".join(absent[:4])
+                print(f"warning    {p.name:<28} {len(absent)} histogram(s) not in its inputs: " + ", ".join(absent[:4])
                       + (", ..." if len(absent) > 4 else ""))
 
     failed = []
 
     def task(p):
+        print(f"processing {p.name} ...", flush=True)
         rc, dt = run_one(cfg, p, labels[p.name], os.path.join(logs, p.name + ".log"))
         if rc == 0:
-            print(f"ok    {p.name:<28} {dt:5.0f} s", flush=True)
+            print(f"completed  {p.name:<28} {dt:5.0f} s", flush=True)
         else:
             failed.append(p)
             log = os.path.join(logs, p.name + ".log")
-            print(f"FAIL  {p.name:<28} {dt:5.0f} s  {describe(rc, log)}, see {log}", flush=True)
+            print(f"FAILED     {p.name:<28} {dt:5.0f} s  {describe(rc, log)}, see {log}", flush=True)
 
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         list(pool.map(task, runnable))

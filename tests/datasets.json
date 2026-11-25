@@ -1,0 +1,16 @@
+{
+  "_comment": "Datasets of the smoke test (tests/run_smoke.sh): the synthetic ntuples it writes. The production directory is tests/work/prod, given by HSCP_PROD_DIR. Same binning as cfg/datasets.json.",
+  "prod_dir": "",
+  "luminosity": 1000,
+  "binning": {
+    "ptcut": 70,
+    "etabins": 96,
+    "ihbins": 400,
+    "pbins": 1000,
+    "massbins": 400,
+    "fpixbins": 20
+  },
+  "samples": {
+    "TestMET2024": {"list": "JetMET2024/testJetMET.txt", "type": "data", "dataset": "JetMET2024"}
+  }
+}

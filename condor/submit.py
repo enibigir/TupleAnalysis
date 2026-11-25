@@ -75,6 +75,7 @@ def main():
     ap.add_argument("--selections-per-job", type=int, default=2,
                     help="selections per job; memory is about 0.7 GB per selection at the default binning")
     ap.add_argument("--selections", default=config.SELECTIONS_FILE)
+    ap.add_argument("--config", default=config.DATASETS_FILE, help="datasets file (default: cfg/datasets.json)")
     ap.add_argument("--prod-dir", help="production directory (default: $HSCP_PROD_DIR, else prod_dir of datasets.json)")
     ap.add_argument("--memory", default="4 GB", help="request_memory")
     ap.add_argument("--cpus", type=int, default=1, help="request_cpus, also HSCP_NTHREADS in the job")
@@ -125,7 +126,7 @@ def main():
 
     # ---- samples ----
     try:
-        cfg = config.load(prod_dir=args.prod_dir)
+        cfg = config.load(args.config, prod_dir=args.prod_dir)
         selected = cfg.select(patterns, args.dataset)
     except config.ConfigError as e:
         sys.exit(f"submit: {e}")
@@ -180,9 +181,9 @@ def main():
     try:
         already = storage.listing(location)
         if already:
-            print(f"warning: {location} already holds {len(already)} file(s); merge.py would use those with the job names")
+            print(f"warning    {location} already holds {len(already)} file(s); merge.py would use those with the job names")
     except storage.StorageError as e:
-        print(f"warning: cannot list {location} from here ({str(e).splitlines()[0]})")
+        print(f"warning    cannot list {location} from here ({str(e).splitlines()[0]})")
 
     # ---- submit file ----
     req = f"requirements = {args.requirements}\n" if args.requirements else ""
@@ -228,10 +229,12 @@ queue sample, chunk, group, out, nosel, ptcut, etabins, ihbins, pbins, massbins,
     if args.submit:
         # through bash, as from a terminal: the condor_submit of some sites (FNAL LPC) is a wrapper
         # script without a #! line, which a direct exec refuses (OSError: Exec format error)
+        print(f"\nprocessing condor_submit of {len(jobs)} jobs ...", flush=True)
         r = subprocess.run(["bash", "-c", 'condor_submit "$1"', "condor_submit", sub_path], cwd=work)
         if r.returncode != 0:
-            sys.exit(f"submit: condor_submit failed (exit code {r.returncode}); the jobs are prepared in {work}, "
-                     f"submit them with: cd {work} && condor_submit hscp.sub")
+            print(f"FAILED     condor_submit, exit code {r.returncode}", flush=True)
+            sys.exit(f"submit: the jobs are prepared in {work}, submit them with: cd {work} && condor_submit hscp.sub")
+        print(f"completed  {len(jobs)} jobs submitted; check them with: condor_q", flush=True)
     else:
         print(f"to submit:   condor_submit {sub_path}")
 

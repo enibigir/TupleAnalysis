@@ -113,7 +113,7 @@ import ROOT
 first = open("input/TestJetMET2024C.txt").readline().strip()
 f = ROOT.TFile.Open(first)
 assert f and not f.IsZombie(), "cannot read the input: check the proxy"
-print("ok:", first.split("/")[-1], "-", [k.GetName() for k in f.GetListOfKeys()][:5])
+print("completed  read test of", first.split("/")[-1], "-", [k.GetName() for k in f.GetListOfKeys()][:5])
 f.Close()
 """)
 
@@ -181,7 +181,7 @@ print(f"{(time.time() - t0) / 60:.1f} min")
 """)
 
 md(r"""
-A sample marked `FAIL` has its reason in its log, e.g. `output/tutorial/TTbar2024.log`. An *HTTP 429*
+A sample marked `FAILED` has its reason in its log, e.g. `output/tutorial/TTbar2024.log`. An *HTTP 429*
 error means the storage refused too many requests: run the cell again with only the failed samples
 (replace `{" ".join(ALL)}` by their names).
 
@@ -249,7 +249,10 @@ os.makedirs(W, exist_ok=True)
 for out, samples in jobs.items():
     r = subprocess.run(["python3", "python/Weight.py", "--samples", ",".join(samples), "--input-dir", "output/tutorial",
                         "--lumi", str(LUMI), "-o", f"{W}/{out}.root", "-f"], capture_output=True, text=True)
-    print(f"{'ok  ' if r.returncode == 0 else 'FAIL'} {out:<24} {r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr.strip()}")
+    if r.returncode == 0:
+        print(next(l for l in r.stdout.splitlines() if l.startswith("completed")))
+    else:
+        print(f"FAILED     {out:<24} {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else 'see the output of Weight.py'}")
 """)
 
 # ======================================================================

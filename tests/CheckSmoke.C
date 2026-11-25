@@ -11,21 +11,21 @@
 static int nFail = 0;
 static void expectEntries(TFile& f, const char* name, double expected) {
     TH1* h = dynamic_cast<TH1*>(f.Get(name));
-    if (!h) { std::cout << "FAIL  missing histogram " << name << std::endl; ++nFail; return; }
+    if (!h) { std::cout << "FAILED     missing histogram " << name << std::endl; ++nFail; return; }
     const double got = h->GetEntries();
-    std::cout << (got == expected ? "ok    " : "FAIL  ") << name << ": entries " << got << " expected " << expected << std::endl;
+    std::cout << (got == expected ? "passed     " : "FAILED     ") << name << ": entries " << got << " expected " << expected << std::endl;
     if (got != expected) ++nFail;
 }
 static void expectAbsent(TFile& f, const char* name) {
     const bool absent = (f.Get(name) == nullptr);
-    std::cout << (absent ? "ok    " : "FAIL  ") << name << (absent ? " absent" : " present but should be absent") << std::endl;
+    std::cout << (absent ? "passed     " : "FAILED     ") << name << (absent ? " absent" : " present but should be absent") << std::endl;
     if (!absent) ++nFail;
 }
 
 void CheckSmoke(const char* fileName, int nFiles = 1, bool expectNosel = true,
                 const char* prefix = "METanalysis_TestPUppiMETCut") {
     TFile f(fileName);
-    if (f.IsZombie()) { std::cout << "FAIL  cannot open " << fileName << std::endl; gSystem->Exit(1); }
+    if (f.IsZombie()) { std::cout << "FAILED     cannot open " << fileName << std::endl; gSystem->Exit(1); }
     const double n = nFiles;   // events 0 and 2 of each file are selected by the Eta2p4 selections
     const TString sel = TString(prefix) + "_Eta2p4";
     expectEntries(f, Form("%s_pT", sel.Data()), 2 * n);

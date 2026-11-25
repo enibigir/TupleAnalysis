@@ -23,6 +23,7 @@ import argparse
 import os
 import shutil
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -45,6 +46,7 @@ def parse_args(argv):
                     help="only the first N files of each sample (a quick look, a tutorial); the weights stay right, "
                          "since the sum of weights counts the events read")
     ap.add_argument("--selections", default=config.SELECTIONS_FILE, help="selection file (default: cfg/selections.json)")
+    ap.add_argument("--config", default=config.DATASETS_FILE, help="datasets file (default: cfg/datasets.json)")
     ap.add_argument("--prod-dir", help="production directory (default: $HSCP_PROD_DIR, else prod_dir of datasets.json)")
     ap.add_argument("--keep-build", action="store_true", help="keep the compiled selector (HSCPSelector_C*) afterwards")
     args = ap.parse_args(argv)
@@ -58,7 +60,7 @@ def parse_args(argv):
 def main(argv=None):
     args = parse_args(argv)
     try:
-        cfg = config.load(prod_dir=args.prod_dir)
+        cfg = config.load(args.config, prod_dir=args.prod_dir)
         names = cfg.select(args.patterns, args.dataset)
     except config.ConfigError as e:
         sys.exit(f"launch: {e}")
@@ -101,19 +103,23 @@ def main(argv=None):
     selector.generate(sels)
     print(f"{len(sels)} selections; compiling the selector ...", flush=True)
     build_log = os.path.join(args.out_dir, "build.log")
+    t0 = time.time()
     if driver.build_selector(log=build_log) != 0:
         sys.exit(f"launch: the selector does not compile, see {build_log}")
+    print(f"compiled in {time.time() - t0:.0f} s; running {len(plan)} sample(s), {args.jobs} at a time"
+          f" (progress in the .log files of {args.out_dir})", flush=True)
 
     threads = args.threads if args.threads is not None else (1 if args.jobs > 1 else None)
     failed = []
 
     def run(item):
         n, flist, out, log = item
+        print(f"processing {n} ...", flush=True)
         rc = driver.run_dataset(n, flist, out, True, cfg.binning(n), log, threads=threads)
         if rc == 0:
-            print(f"ok    {n:<34} -> {out}", flush=True)
+            print(f"completed  {n:<34} -> {out}", flush=True)
         else:
-            print(f"FAIL  {n:<34} -> {log}  ({driver.describe_exit(rc)})", flush=True)
+            print(f"FAILED     {n:<34} -> {log}  ({driver.describe_exit(rc)})", flush=True)
         return n, rc
 
     if args.jobs > 1:
