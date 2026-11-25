@@ -1,0 +1,26 @@
+{
+  "_comment": "Plot configuration of the tutorial (tutorial/HSCP_tutorial.ipynb), read by python/stack.py and python/plots.py. The notebook sets lumi_label from the luminosity it computes and writes a copy to output/tutorial/plots.json. Paths are relative to the repository.",
+  "output_dir": "outputDisplay/tutorial",
+  "lumi_label": "set by the notebook",
+  "inputs": {
+    "data":        {"file": "output/tutorial/JetMET2024C.root", "label": "Data (JetMET 2024C)"},
+    "qcd":         {"file": "output/tutorial/weighted/QCD2024_weighted.root", "label": "QCD (#mu enriched)", "color": "kGreen-4"},
+    "ttbar":       {"file": "output/tutorial/weighted/TTbar2024_weighted.root", "label": "t#bar{t}#rightarrow2l2#nu", "color": "kRed"},
+    "wjets":       {"file": "output/tutorial/weighted/WjetMuNu2024_weighted.root", "label": "W(#rightarrow#mu#nu)+jets", "color": "kBlue-7"},
+    "gluino_1400": {"file": "output/tutorial/weighted/Gluino_1400_weighted.root", "label": "#tilde{g} (m=1400 GeV)"},
+    "gluino_1600": {"file": "output/tutorial/weighted/Gluino_1600_weighted.root", "label": "#tilde{g} (m=1600 GeV)"},
+    "gluino_2000": {"file": "output/tutorial/weighted/Gluino_2000_weighted.root", "label": "#tilde{g} (m=2000 GeV)"},
+    "gluino_1600_raw": {"file": "output/tutorial/Gluino_Run3_MET_madgraph_1600.root", "label": "#tilde{g} (m=1600 GeV)"}
+  },
+  "stack": {"data": "data", "backgrounds": ["qcd", "ttbar", "wjets"], "signals": ["gluino_1600", "gluino_2000"]},
+  "plots": [
+    {"function": "Cutflows", "args": ["qcd", "ttbar", null, "wjets", "data", "gluino_1600"],
+     "note": "event cutflow: QCD, ttbar, (no semileptonic ttbar), W+jets, data, signal x100"},
+    {"function": "FpixelPlot", "args": ["wjets", "data", "gluino_1600_raw"],
+     "note": "Fpixel before selection, shapes of W+jets and the signal"},
+    {"function": "CompareMaping", "args": ["ttbar", "wjets", "qcd", "gluino_1600"],
+     "note": "pT against Fpixel of the summed backgrounds"},
+    {"function": "CompareKinematics", "args": ["data", "gluino_1400", "gluino_1600", "gluino_2000"],
+     "note": "PF against track kinematics; the three signal slots are named 1400, 2000, 2600 in the file names, the labels give the masses"}
+  ]
+}
